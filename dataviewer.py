@@ -4,11 +4,11 @@ from datasets import load_from_disk
 import json
 import hydra
 from module.data import *
-from module.model import *
+import pandas as pd
 
 
 # 화면 레이아웃 설정
-st.set_page_config(layout="wide", page_title="SEVEN ELEVEN MRC Data Viewer V1.0.0")
+st.set_page_config(layout="wide", page_title="SEVEN ELEVEN MRC Data Viewer V1.0.1")
 
 
 @st.cache_data
@@ -16,15 +16,17 @@ def load_data(_config):
     """
     질문-문서(-정답) 페어 데이터셋을 Dataframe 형식으로 불러오는 함수입니다.
     Args:
-        _config: 템플릿의 config.yaml 파일입니다. 템플릿을 사용하지 않을 경우 지우거나 주석처리하고 사용하려는 데이터셋 경로를 지정해주세요.
+        _config: 템플릿의 config/mrc.yaml 파일 기준으로 작성되어 있습니다. 템플릿을 사용하지 않을 경우 지우거나 주석처리하고 사용하려는 데이터 경로를 지정해주세요.
     Returns:
         dataset: 질문-문서(-정답) 페어 데이터셋입니다.
     """
 
-    # data_path = os.path.dirname(os.path.abspath(__file__)) + f"/data/train_dataset/train"  # 베이스라인 데이터의 train_dataset/train
     data_path = (
-        os.path.dirname(os.path.abspath(__file__)) + f"/data/train_dataset/validation"
-    )  # 베이스라인 데이터의 train_dataset/validation
+        os.path.dirname(os.path.abspath(__file__)) + f"/data/train_dataset/train"
+    )  # 베이스라인 데이터의 train_dataset/train
+    # data_path = (
+    #     os.path.dirname(os.path.abspath(__file__)) + f"/data/train_dataset/validation"
+    # )  # 베이스라인 데이터의 train_dataset/validation
 
     # # config에 설정한 데이터셋 불러오기
     # # **미구현**
@@ -42,15 +44,14 @@ def load_data(_config):
 @st.cache_data
 def load_predictions(_config):
     """
-    질문에 대한 nbest 예측 데이터를 Object 형식으로 불러오는 함수입니다.
+    (eval dataset의) 질문에 대한 nbest 예측 데이터를 Object 형식으로 불러오는 함수입니다.
     Args:
-        _config: 템플릿의 config.yaml 파일입니다. 템플릿을 사용하지 않을 경우 지우거나 주석처리하고 사용하려는 데이터 경로를 지정해주세요.
+        _config: 템플릿의 config/mrc.yaml 파일 기준으로 작성되어 있습니다. 템플릿을 사용하지 않을 경우 지우거나 주석처리하고 사용하려는 데이터 경로를 지정해주세요.
     Returns:
         predictions: 질문에 대한 nbest 예측 데이터
     """
     # config에 설정한 output dir 경로의 nbest prediction
     predictions_path = f"{_config.train.output_dir}/eval_nbest_predictions.json"
-    # prediction_path = os.path.dirname(os.path.abspath(__file__)) + "/outputs/eval_nbest_predictions.json"
 
     if os.path.exists(predictions_path):
         with open(predictions_path, "r", encoding="utf-8") as f:
@@ -67,12 +68,12 @@ def load_tokenized_samples(_config):
     질문-문서 시퀀스의 토크나이징 결과 데이터를 Object 형식으로 불러오는 함수입니다.
     토큰 데이터가 없는 경우 원하는 데이터에 대해 utils/save_tokenized_samples.py를 실행하세요.
     Args:
-        _config: 템플릿의 config.yaml 파일입니다. 템플릿을 사용하지 않을 경우 지우거나 주석처리하고 사용하려는 데이터 경로를 지정해주세요.
+        _config: 템플릿의 config/mrc.yaml 파일 기준으로 작성되어 있습니다. 템플릿을 사용하지 않을 경우 지우거나 주석처리하고 사용하려는 데이터 경로를 지정해주세요.
     Returns:
         tokenized_samples: 질문-문서 시퀀스의 토크나이징 결과 데이터
     """
-    tokenized_samples_path = f"{_config.train.output_dir}/tokenized_samples.json"
-    # tokenized_samples_path = os.path.dirname(os.path.abspath(__file__)) + "/outputs/tokenized_samples.json"
+    tokenized_samples_path = f"{_config.train.output_dir}/train_tokenized_samples.json"
+    # tokenized_samples_path = f"{_config.train.output_dir}/eval_tokenized_samples.json"
 
     if os.path.exists(tokenized_samples_path):
         with open(tokenized_samples_path, "r", encoding="utf-8") as f:
@@ -156,7 +157,7 @@ def view_QA(question_id, data, prediction):
         st.write("선택된 문서와 질문 ID에 해당하는 데이터가 없습니다.")
 
 
-@hydra.main(config_path=".", config_name="config", version_base=None)
+@hydra.main(config_path="./config", config_name="mrc", version_base=None)
 def main(config):
     """
     전체 화면 요소를 그리는 함수입니다. (추후 모듈화, 재사용성 보완 예정.)
