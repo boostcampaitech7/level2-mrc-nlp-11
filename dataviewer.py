@@ -8,7 +8,7 @@ import pandas as pd
 
 
 # 화면 레이아웃 설정
-st.set_page_config(layout="wide", page_title="SEVEN ELEVEN MRC Data Viewer V1.0.1")
+st.set_page_config(layout="wide", page_title="SEVEN ELEVEN MRC Data Viewer V1.0.0")
 
 
 @st.cache_data
@@ -44,7 +44,7 @@ def load_data(_config):
 @st.cache_data
 def load_predictions(_config):
     """
-    (eval dataset의) 질문에 대한 nbest 예측 데이터를 Object 형식으로 불러오는 함수입니다.
+    질문에 대한 nbest 예측 데이터를 Object 형식으로 불러오는 함수입니다.
     Args:
         _config: 템플릿의 config/mrc.yaml 파일 기준으로 작성되어 있습니다. 템플릿을 사용하지 않을 경우 지우거나 주석처리하고 사용하려는 데이터 경로를 지정해주세요.
     Returns:
@@ -52,6 +52,7 @@ def load_predictions(_config):
     """
     # config에 설정한 output dir 경로의 nbest prediction
     predictions_path = f"{_config.train.output_dir}/eval_nbest_predictions.json"
+    # prediction_path = os.path.dirname(os.path.abspath(__file__)) + "/outputs/eval_nbest_predictions.json"
 
     if os.path.exists(predictions_path):
         with open(predictions_path, "r", encoding="utf-8") as f:
@@ -73,7 +74,7 @@ def load_tokenized_samples(_config):
         tokenized_samples: 질문-문서 시퀀스의 토크나이징 결과 데이터
     """
     tokenized_samples_path = f"{_config.train.output_dir}/train_tokenized_samples.json"
-    # tokenized_samples_path = f"{_config.train.output_dir}/eval_tokenized_samples.json"
+    # tokenized_samples_path = os.path.dirname(os.path.abspath(__file__)) + "/outputs/tokenized_samples.json"
 
     if os.path.exists(tokenized_samples_path):
         with open(tokenized_samples_path, "r", encoding="utf-8") as f:
@@ -81,6 +82,34 @@ def load_tokenized_samples(_config):
         return tokenized_samples
     else:
         print("⚠️지정한 경로에 tokenized sample 파일이 존재하지 않습니다.")
+        return None
+
+
+@st.cache_data
+def load_wiki():
+    wiki_path = (
+        os.path.dirname(os.path.abspath(__file__)) + "/data/wikipedia_documents.json"
+    )
+    if os.path.exists(wiki_path):
+        with open(wiki_path, "r", encoding="utf-8") as f:
+            wiki_data = pd.read_json(wiki_path, orient="index")
+        return wiki_data
+    else:
+        print("⚠️지정한 경로에 wiki documents 파일이 존재하지 않습니다.")
+        return None
+
+
+@st.cache_data
+def load_tfidf_info(_config):
+    tfidf_info_path = f"{_config.train.output_dir}/wiki_tfidf_info.json"
+
+    print("111")
+    if os.path.exists(tfidf_info_path):
+        with open(tfidf_info_path, "r", encoding="utf-8") as f:
+            tfidf_info = json.load(f)
+        return tfidf_info
+    else:
+        print("⚠️지정한 경로에 tfidf info 파일이 존재하지 않습니다.")
         return None
 
 
@@ -167,7 +196,7 @@ def main(config):
     predictions = load_predictions(config)
     tokenized_samples = load_tokenized_samples(config)
 
-    tab1, tab2 = st.tabs(["하나씩 보기", "묶음으로 보기"])
+    tab1, tab2, tab3 = st.tabs(["하나씩 보기", "묶음으로 보기", "위키 문서 살펴보기"])
     # ================
     # 하나씩 보기 탭
     # ================
@@ -353,6 +382,59 @@ def main(config):
                             )
                         else:
                             st.write("해당 쿼리에 대한 토큰화 정보가 없습니다🫠")
+
+    # ================
+    # 위키 문서 살펴보기 탭
+    # ================
+    with tab3:
+        wiki_documents = load_wiki()
+        tfidf_infos = load_tfidf_info(config)
+
+        # 한 페이지에 표시할 항목 개수 설정
+        documents_per_page = st.selectbox(
+            "페이지 당 표시할 문서 수", [10, 20, 30], index=0
+        )
+
+        # 전체 페이지 수 계산
+        total_document_pages = len(wiki_documents) // documents_per_page + (
+            1 if len(wiki_documents) % documents_per_page > 0 else 0
+        )
+
+        # 현재 페이지 선택 슬라이더
+        document_page = st.slider(
+            "페이지 선택", 1, total_document_pages, 1, key="document_slider"
+        )
+
+        # 현재 페이지에 해당하는 데이터만 선택
+        start_idx = (document_page - 1) * documents_per_page
+        end_idx = start_idx + documents_per_page
+        selected_documents = wiki_documents.iloc[start_idx:end_idx]
+
+        # 현재 페이지의 데이터 출력
+        st.write(f"### 현재 페이지: {document_page} / {total_document_pages}")
+
+        for idx, row in selected_documents.iterrows():
+            tfidf_info = tfidf_infos[str(idx)]
+            with st.expander(f"{row['document_id']}: {row['title']}"):
+                st.write(
+                    f"Domain: {row['domain']} | Corpus Source: {row['corpus_source']} | Author: {row['author']} html: {row['html']} | url: {row['url']}"
+                )
+
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.subheader("Markdown")
+                    st.write(row["text"])
+                with c2:
+                    st.subheader("Raw text")
+                    st.text(row["text"])
+
+                st.subheader("TF-IDF 점수 상위 10개 토큰")
+                tfidf_text = []
+                for t, score in tfidf_info.items():
+                    tfidf_text.append(
+                        f"<div style='display:inline-block; font-size:14px; background-color:#c5cff6; border:1px solid #ddd; border-radius:5px; padding:1px 5px; margin:2px;'>{t}</div>: {round(score, 3)}"
+                    )
+                st.markdown(", ".join(tfidf_text), unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
