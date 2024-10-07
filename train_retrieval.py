@@ -15,6 +15,7 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
+
 @hydra.main(config_path="./config", config_name="retrieval", version_base=None)
 def main(config):
 
@@ -26,31 +27,38 @@ def main(config):
 
     # 2. set model
     # 2.1. set encoder model
-    p_encoder = getattr(module_encoder, config.model.encoder).from_pretrained(config.model.plm_name)
-    q_encoder = getattr(module_encoder, config.model.encoder).from_pretrained(config.model.plm_name)
+    p_encoder = getattr(module_encoder, config.model.encoder).from_pretrained(
+        config.model.plm_name
+    )
+    q_encoder = getattr(module_encoder, config.model.encoder).from_pretrained(
+        config.model.plm_name
+    )
     # 2.2. set retrieval module(=pl.LightningModule class)
     retrieval = DenseRetrieval(config, q_encoder, p_encoder)
 
     # 3. set trainer(=pl.Trainer) & train
     checkpoint_callback = ModelCheckpoint(
-        dirpath='checkpoints',
-        filename='model-{epoch:02d}-{val_loss:.2f}',
+        dirpath="checkpoints",
+        filename="model-{epoch:02d}-{val_loss:.2f}",
         save_top_k=1,
-        monitor='accuracy',
-        mode='max',
+        monitor="accuracy",
+        mode="max",
     )
-    trainer = pl.Trainer(num_sanity_val_steps=0, 
-                         accelerator="gpu", 
-                         devices=1, 
-                         max_epochs=config.train.num_train_epochs, 
-                         log_every_n_steps=1,
-                         enable_checkpointing=False,
-                         logger=logger)
+    trainer = pl.Trainer(
+        num_sanity_val_steps=0,
+        accelerator="gpu",
+        devices=1,
+        max_epochs=config.train.num_train_epochs,
+        log_every_n_steps=1,
+        enable_checkpointing=False,
+        logger=logger,
+    )
     trainer.fit(model=retrieval, datamodule=data_module)
 
     # 4. test by validation dataset
-    #retrieval.create_embedding_vector()
-    #print(retrieval.search("우리나라 대통령은 누구야?"))
+    # retrieval.create_embedding_vector()
+    # print(retrieval.search("우리나라 대통령은 누구야?"))
+
 
 if __name__ == "__main__":
     main()

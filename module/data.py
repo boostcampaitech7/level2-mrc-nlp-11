@@ -22,47 +22,71 @@ class MrcDataModule(pl.LightningDataModule):
         self.eval_examples = None
         self.test_examples = None
 
-    def setup(self, stage='fit'):
+    def setup(self, stage="fit"):
 
         dataset_list = get_dataset_list(self.config.data.dataset_name)
 
-        if stage == 'fit':
+        if stage == "fit":
             datasets = DatasetDict()
-            for split in ['train', 'validation']:
-                datasets[split] = concatenate_datasets([ds[split] for ds in dataset_list])
+            for split in ["train", "validation"]:
+                datasets[split] = concatenate_datasets(
+                    [ds[split] for ds in dataset_list]
+                )
 
-            self.train_examples = datasets['train'].select(range(100))
-            self.eval_examples = datasets['validation'].select(range(100))
-            self.train_dataset = self.get_dataset(self.train_examples, self.prepare_train_features)
-            self.eval_dataset = self.get_dataset(self.eval_examples, self.prepare_validation_features)
+            self.train_examples = datasets["train"].select(range(100))
+            self.eval_examples = datasets["validation"].select(range(100))
+            self.train_dataset = self.get_dataset(
+                self.train_examples, self.prepare_train_features
+            )
+            self.eval_dataset = self.get_dataset(
+                self.eval_examples, self.prepare_validation_features
+            )
             print(self.train_dataset)
             print(self.eval_dataset)
 
         if stage == "test":
             datasets = DatasetDict()
-            self.test_examples = concatenate_datasets([ds["test"] for ds in dataset_list]).select(range(100))
-            self.test_dataset = self.get_dataset(self.test_examples, self.prepare_validation_features)
+            self.test_examples = concatenate_datasets(
+                [ds["test"] for ds in dataset_list]
+            ).select(range(100))
+            self.test_dataset = self.get_dataset(
+                self.test_examples, self.prepare_validation_features
+            )
             print(self.test_dataset)
 
     def get_dataset(self, examples, preprocess_func=None):
         return examples.map(
-            self.prepare_validation_features if not preprocess_func else preprocess_func,
+            (
+                self.prepare_validation_features
+                if not preprocess_func
+                else preprocess_func
+            ),
             batched=True,
             num_proc=self.config.data.preprocessing_num_workers,
-            remove_columns=examples.column_names
+            remove_columns=examples.column_names,
         )
 
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(self.train_dataset, \
-                    batch_size=self.config.data.batch_size, collate_fn=default_data_collator, shuffle=True)
+        return torch.utils.data.DataLoader(
+            self.train_dataset,
+            batch_size=self.config.data.batch_size,
+            collate_fn=default_data_collator,
+            shuffle=True,
+        )
 
     def val_dataloader(self):
-        return torch.utils.data.DataLoader(self.eval_dataset.remove_columns('offset_mapping'), \
-                    collate_fn=default_data_collator, batch_size=self.config.data.batch_size)
+        return torch.utils.data.DataLoader(
+            self.eval_dataset.remove_columns("offset_mapping"),
+            collate_fn=default_data_collator,
+            batch_size=self.config.data.batch_size,
+        )
 
     def test_dataloader(self):
-        return torch.utils.data.DataLoader(self.test_dataset.remove_columns('offset_mapping'), \
-                    collate_fn=default_data_collator, batch_size=self.config.data.batch_size)
+        return torch.utils.data.DataLoader(
+            self.test_dataset.remove_columns("offset_mapping"),
+            collate_fn=default_data_collator,
+            batch_size=self.config.data.batch_size,
+        )
 
     def prepare_train_features(self, examples):
         """
@@ -100,7 +124,6 @@ class MrcDataModule(pl.LightningDataModule):
             # We will label impossible answers with the index of the CLS token.
             input_ids = tokenized_examples["input_ids"][i]
             cls_index = input_ids.index(self.tokenizer.cls_token_id)
-            #cls_index = input_ids.index(self.tokenizer.sep_token_id)
 
             # Grab the sequence corresponding to that example (to know what is the context and what is the question).
             sequence_ids = tokenized_examples.sequence_ids(i)
@@ -108,7 +131,7 @@ class MrcDataModule(pl.LightningDataModule):
             # One example can give several spans, this is the index of the example containing this span of text.
             sample_index = sample_mapping[i]
             answers = examples["answers"][sample_index]
-            #answers = examples["answers"]
+
             # If no answers are given, set the cls_index as answer.
             if len(answers["answer_start"]) == 0:
                 tokenized_examples["start_positions"].append(cls_index)
@@ -129,13 +152,19 @@ class MrcDataModule(pl.LightningDataModule):
                     token_end_index -= 1
 
                 # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-                if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
+                if not (
+                    offsets[token_start_index][0] <= start_char
+                    and offsets[token_end_index][1] >= end_char
+                ):
                     tokenized_examples["start_positions"].append(cls_index)
                     tokenized_examples["end_positions"].append(cls_index)
                 else:
                     # Otherwise move the token_start_index and token_end_index to the two ends of the answer.
                     # Note: we could go after the last offset if the answer is the last word (edge case).
-                    while token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char:
+                    while (
+                        token_start_index < len(offsets)
+                        and offsets[token_start_index][0] <= start_char
+                    ):
                         token_start_index += 1
                     tokenized_examples["start_positions"].append(token_start_index - 1)
                     while offsets[token_end_index][1] >= end_char:
@@ -181,7 +210,7 @@ class MrcDataModule(pl.LightningDataModule):
             # One example can give several spans, this is the index of the example containing this span of text.
             sample_index = sample_mapping[i]
             tokenized_examples["example_id"].append(examples["id"][sample_index])
-            #tokenized_examples["example_id"].append(examples["id"])
+            # tokenized_examples["example_id"].append(examples["id"])
 
             # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
             # position is part of the context or not.
@@ -191,6 +220,7 @@ class MrcDataModule(pl.LightningDataModule):
             ]
 
         return tokenized_examples
+
 
 class RetrievalDataModule(pl.LightningDataModule):
 
@@ -203,23 +233,27 @@ class RetrievalDataModule(pl.LightningDataModule):
         self.eval_dataset = None
         self.test_dataset = None
 
-    def setup(self, stage='fit'):
+    def setup(self, stage="fit"):
 
         dataset_list = get_dataset_list(self.config.data.dataset_name)
 
         if stage == "fit":
             datasets = DatasetDict()
-            for split in ['train', 'validation']:
-                datasets[split] = concatenate_datasets([ds[split] for ds in dataset_list])
+            for split in ["train", "validation"]:
+                datasets[split] = concatenate_datasets(
+                    [ds[split] for ds in dataset_list]
+                )
 
-            train_dataset = datasets['train'].select(range(100))
-            eval_dataset = datasets['validation'].select(range(100))
+            train_dataset = datasets["train"].select(range(100))
+            eval_dataset = datasets["validation"].select(range(100))
 
             self.train_dataset = self.preprocessing(train_dataset)
             self.eval_dataset = self.preprocessing(eval_dataset)
 
         if stage == "test":
-            test_dataset = concatenate_datasets([ds['test'] for ds in dataset_list]).select(range(100))
+            test_dataset = concatenate_datasets(
+                [ds["test"] for ds in dataset_list]
+            ).select(range(100))
             self.test_dataset = self.preprocessing(test_dataset)
 
     def preprocessing(self, dataset):
@@ -227,7 +261,7 @@ class RetrievalDataModule(pl.LightningDataModule):
         corpus = np.array(list(set([example["context"] for example in dataset])))
         p_with_neg = []
 
-        for context in dataset['context']:
+        for context in dataset["context"]:
             while True:
                 neg_idxs = np.random.randint(len(corpus), size=self.config.data.num_neg)
 
@@ -239,10 +273,10 @@ class RetrievalDataModule(pl.LightningDataModule):
 
         q_seqs = self.tokenizer(
             dataset["question"],
-            padding='max_length',
+            padding="max_length",
             truncation=True,
-            return_tensors='pt',
-            max_length=self.config.data.max_seq_length
+            return_tensors="pt",
+            max_length=self.config.data.max_seq_length,
         )
 
         p_seqs = self.tokenizer(
@@ -250,24 +284,39 @@ class RetrievalDataModule(pl.LightningDataModule):
             padding="max_length",
             truncation=True,
             return_tensors="pt",
-            max_length=self.config.data.max_seq_length
+            max_length=self.config.data.max_seq_length,
         )
 
-        p_seqs["input_ids"] = p_seqs["input_ids"].view(-1, self.config.data.num_neg + 1, self.config.data.max_seq_length)
-        p_seqs["attention_mask"] = p_seqs["attention_mask"].view(-1, self.config.data.num_neg + 1, self.config.data.max_seq_length)
-        p_seqs["token_type_ids"] = p_seqs["token_type_ids"].view(-1, self.config.data.num_neg + 1, self.config.data.max_seq_length)
+        p_seqs["input_ids"] = p_seqs["input_ids"].view(
+            -1, self.config.data.num_neg + 1, self.config.data.max_seq_length
+        )
+        p_seqs["attention_mask"] = p_seqs["attention_mask"].view(
+            -1, self.config.data.num_neg + 1, self.config.data.max_seq_length
+        )
+        p_seqs["token_type_ids"] = p_seqs["token_type_ids"].view(
+            -1, self.config.data.num_neg + 1, self.config.data.max_seq_length
+        )
 
         return TensorDataset(
-            p_seqs["input_ids"], p_seqs["attention_mask"], p_seqs["token_type_ids"],
-            q_seqs["input_ids"], q_seqs["attention_mask"], q_seqs["token_type_ids"]
+            p_seqs["input_ids"],
+            p_seqs["attention_mask"],
+            p_seqs["token_type_ids"],
+            q_seqs["input_ids"],
+            q_seqs["attention_mask"],
+            q_seqs["token_type_ids"],
         )
 
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(self.train_dataset, \
-                    batch_size=self.config.data.batch_size, shuffle=True)
+        return torch.utils.data.DataLoader(
+            self.train_dataset, batch_size=self.config.data.batch_size, shuffle=True
+        )
 
     def val_dataloader(self):
-        return torch.utils.data.DataLoader(self.eval_dataset, batch_size=self.config.data.batch_size)
+        return torch.utils.data.DataLoader(
+            self.eval_dataset, batch_size=self.config.data.batch_size
+        )
 
     def test_dataloader(self):
-        return torch.utils.data.DataLoader(self.test_dataset, batch_size=self.config.data.batch_size)
+        return torch.utils.data.DataLoader(
+            self.test_dataset, batch_size=self.config.data.batch_size
+        )
