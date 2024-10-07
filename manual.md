@@ -1,6 +1,8 @@
 ## streamlit dataviewer 사용법
 
-- `chmod +x ./run_streamlit.sh` 명령어로 권한 설정해주고, `./run_streamlit.sh` 해주면 토큰화 결과, prediction 파일 없으면 알아서 생성해준 다음 프로토타입이 실행됩니다. 그냥 프로토타입만 실행하고 싶으면 `streamlit run dataviewer.py`
+- `chmod +x ./run_streamlit.sh` 명령어로 권한 설정해주고, `./run_streamlit.sh`해주면 토큰화 결과, prediction 파일 없으면 알아서 생성해준 다음 프로토타입이 실행됩니다. 그냥 프로토타입만 실행하고 싶으면`streamlit run dataviewer.py`
+
+- 각 파일의 경로가 제가 설정해놓은 거랑 다를 수 있어서 `dataviewer.py`의 load\_... 함수들에서 파일 경로 적절히 설정해주셔야 합니다!
 
 ### 템플릿에서 추가해줘야 하는 부분
 
