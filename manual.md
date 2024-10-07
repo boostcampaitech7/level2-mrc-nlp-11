@@ -1,7 +1,10 @@
 ### streamlit dataviewer 사용법
 
-템플릿과 제대로 합쳐져 있지 않은 현재 버전에서 사용법입니다. (템플릿 완성 후 템플릿에 결합되도록 수정/보완 예정)
-streamlit prototype 실행은 터미널에서 `streamlit run dataviewer.py` 입력하시면 됩니다. (파일 경로 확인)
+- 템플릿과 제대로 합쳐져 있지 않은 현재 버전에서 사용법입니다. (템플릿 완성 후 템플릿에 결합되도록 수정/보완 예정)
+
+- streamlit prototype 실행은 터미널에서 `streamlit run dataviewer.py` 입력하시면 됩니다. (파일 경로 확인)
+
+- 각 파일의 경로가 제가 설정해놓은 거랑 다를 수 있어서 `dataviewer.py`의 load_... 함수들에서 파일 경로 적절히 설정해주셔야 합니다!
 
 1. 베이스라인 코드로 사용하는 경우
 
