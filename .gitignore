@@ -1,0 +1,9 @@
+/lightning_logs
+__pycache__
+outputs/
+data/
+test/
+wandb/
+tfidf/
+tfidf.py
+checkpoints/
