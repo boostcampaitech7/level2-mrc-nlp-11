@@ -38,18 +38,14 @@ class TfIdfRetrieval:
         )
         self.sparse_embedding_matrix = None
 
-    def prepare_contexts(
-        self,
-    ):
+    def prepare_contexts(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         context_data_path = f"{parent_directory}/{self.config.tfidf.data_path}"
         with open(context_data_path, "r", encoding="utf-8") as file:
             data = json.load(file)
         return np.array(list(dict.fromkeys([v["text"] for v in data.values()])))
 
-    def fit(
-        self,
-    ):
+    def fit(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         tfidf_model_dir = f"{parent_directory}/tfidf"
         tfidf_model_path = f"{tfidf_model_dir}/{self.config.tfidf.model_file_name}"
@@ -64,9 +60,7 @@ class TfIdfRetrieval:
             with open(tfidf_model_path, "wb") as file:
                 pickle.dump(self.vectorizer, file)
 
-    def create_embedding_vector(
-        self,
-    ):
+    def create_embedding_vector(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         tfidf_emb_dir = f"{parent_directory}/tfidf"
         tfidf_emb_path = f"{tfidf_emb_dir}/{self.config.tfidf.emb_file_name}"
@@ -113,9 +107,7 @@ class DenseRetrieval(pl.LightningModule):
             for metric in self.config.metric
         }
 
-    def configure_optimizers(
-        self,
-    ):
+    def configure_optimizers(self):
         trainable_params1 = list(
             filter(lambda p: p.requires_grad, self.q_encoder.parameters())
         )
@@ -205,9 +197,7 @@ class DenseRetrieval(pl.LightningModule):
         self.validation_step_outputs["sim_score"].extend(similarity_scores.cpu())
         self.validation_step_outputs["targets"].extend(targets.cpu())
 
-    def on_validation_epoch_end(
-        self,
-    ):
+    def on_validation_epoch_end(self):
         for k, v in self.validation_step_outputs.items():
             self.validation_step_outputs[k] = np.array(v).squeeze()
 
@@ -220,9 +210,7 @@ class DenseRetrieval(pl.LightningModule):
                 self.log(k, v)
         self.validation_step_outputs = {"sim_score": [], "targets": []}
 
-    def create_embedding_vector(
-        self,
-    ):
+    def create_embedding_vector(self):
         self.p_encoder.eval()
         dataset_list = get_dataset_list(self.config.data.dataset_name)
 

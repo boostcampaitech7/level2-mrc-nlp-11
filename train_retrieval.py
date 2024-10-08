@@ -6,6 +6,7 @@ import module.data as module_data
 from module.retrieval import DenseRetrieval
 import module.encoder as module_encoder
 from pytorch_lightning.callbacks import ModelCheckpoint
+from datasets import set_caching_enabled
 import hydra
 
 # fix random seeds for reproducibility
@@ -14,6 +15,8 @@ torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
+
+set_caching_enabled(False)
 
 
 @hydra.main(config_path="./config", config_name="retrieval", version_base=None)

@@ -39,6 +39,18 @@ class MrcLightningModule(pl.LightningModule):
             for metric in self.config.metric
         }
 
+    def on_save_checkpoint(self, checkpoint):
+        del checkpoint["hyper_parameters"]["eval_dataset"]
+        del checkpoint["hyper_parameters"]["test_dataset"]
+        del checkpoint["hyper_parameters"]["eval_examples"]
+        del checkpoint["hyper_parameters"]["test_examples"]
+
+    def on_load_checkpoint(self, checkpoint):
+        self.eval_dataset = None
+        self.test_dataset = None
+        self.eval_examples = None
+        self.test_examples = None
+
     def configure_optimizers(self):
         trainable_params = list(
             filter(lambda p: p.requires_grad, self.model.parameters())
@@ -61,9 +73,7 @@ class MrcLightningModule(pl.LightningModule):
         self.step_outputs["start_logits"].extend(qa_output["start_logits"].cpu())
         self.step_outputs["end_logits"].extend(qa_output["end_logits"].cpu())
 
-    def on_validation_epoch_end(
-        self,
-    ):
+    def on_validation_epoch_end(self):
         eval_preds = self.post_processing_function(
             self.eval_examples,
             self.eval_dataset,
@@ -85,9 +95,7 @@ class MrcLightningModule(pl.LightningModule):
         self.step_outputs["start_logits"].extend(qa_output["start_logits"].cpu())
         self.step_outputs["end_logits"].extend(qa_output["end_logits"].cpu())
 
-    def on_test_epoch_end(
-        self,
-    ):
+    def on_test_epoch_end(self):
         self.post_processing_function(
             self.test_examples,
             self.test_dataset,

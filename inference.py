@@ -9,17 +9,14 @@ import hydra
 @hydra.main(config_path="./config", config_name="combine", version_base=None)
 def main(config):
 
-    mode = "validation"
-    only_mrc = False
-    model_checkpoint = "/data/ephemeral/home/gj/mrc-template/test/2pl0fmh1/checkpoints/epoch=1-step=26.ckpt"
     mode = "test"
+    only_mrc = False
+    model_checkpoint = "/data/ephemeral/home/gj/level2-mrc-nlp-11/checkpoints/baseline-epoch=00-exact_match=37.92.ckpt"
 
     if mode == "validation":
         # 1. load eval examples
         dataset_list = get_dataset_list(config.mrc.data.dataset_name)
-        eval_examples = concatenate_datasets(
-            [ds["validation"] for ds in dataset_list]
-        ).select(range(100))
+        eval_examples = concatenate_datasets([ds["validation"] for ds in dataset_list])
 
         if not only_mrc:
             # 2. retrieve context
@@ -49,9 +46,9 @@ def main(config):
 
     else:
         # 1. load test examples
-        test_examples = load_from_disk("./data/default/test_dataset/")[
-            "validation"
-        ].select(range(100))
+        if not os.path.exists(f"./data/test_dataset/"):
+            get_dataset_list(["default"])
+        test_examples = load_from_disk("./data/test_dataset/")["validation"]
 
         # 2. retrieve context
         retrieval = TfIdfRetrieval(config.retrieval)

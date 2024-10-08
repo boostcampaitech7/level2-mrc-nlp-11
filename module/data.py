@@ -33,8 +33,8 @@ class MrcDataModule(pl.LightningDataModule):
                     [ds[split] for ds in dataset_list]
                 )
 
-            self.train_examples = datasets["train"].select(range(100))
-            self.eval_examples = datasets["validation"].select(range(100))
+            self.train_examples = datasets["train"]
+            self.eval_examples = datasets["validation"]
             self.train_dataset = self.get_dataset(
                 self.train_examples, self.prepare_train_features
             )
@@ -48,7 +48,7 @@ class MrcDataModule(pl.LightningDataModule):
             datasets = DatasetDict()
             self.test_examples = concatenate_datasets(
                 [ds["test"] for ds in dataset_list]
-            ).select(range(100))
+            )
             self.test_dataset = self.get_dataset(
                 self.test_examples, self.prepare_validation_features
             )
@@ -119,6 +119,7 @@ class MrcDataModule(pl.LightningDataModule):
         # Let's label those examples!
         tokenized_examples["start_positions"] = []
         tokenized_examples["end_positions"] = []
+        tokenized_examples["example_id"] = []
 
         for i, offsets in enumerate(offset_mapping):
             # We will label impossible answers with the index of the CLS token.
@@ -131,6 +132,7 @@ class MrcDataModule(pl.LightningDataModule):
             # One example can give several spans, this is the index of the example containing this span of text.
             sample_index = sample_mapping[i]
             answers = examples["answers"][sample_index]
+            tokenized_examples["example_id"].append(examples["id"][sample_index])
 
             # If no answers are given, set the cls_index as answer.
             if len(answers["answer_start"]) == 0:

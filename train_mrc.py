@@ -2,6 +2,8 @@ import pytorch_lightning as pl
 import module.data as module_data
 from module.mrc import *
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
+from datasets import set_caching_enabled
 import hydra
 
 # fix random seeds for reproducibility
@@ -12,6 +14,7 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 """
+set_caching_enabled(False)
 
 
 @hydra.main(config_path="./config", config_name="mrc", version_base=None)
@@ -35,11 +38,19 @@ def main(config):
     )
 
     # 3. set trainer(=pl.Trainer) & train
+    checkpoint_callback = ModelCheckpoint(
+        dirpath="checkpoints",
+        filename="baseline-{epoch:02d}-{exact_match:.2f}",
+        save_top_k=1,
+        monitor="exact_match",
+        mode="max",
+    )
     trainer = pl.Trainer(
         num_sanity_val_steps=0,
         accelerator="gpu",
         devices=1,
         max_epochs=config.train.num_train_epochs,
+        callbacks=[checkpoint_callback],
         log_every_n_steps=1,
         logger=logger,
     )
