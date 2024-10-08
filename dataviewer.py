@@ -92,8 +92,13 @@ def load_wiki():
     )
     if os.path.exists(wiki_path):
         with open(wiki_path, "r", encoding="utf-8") as f:
-            wiki_data = pd.read_json(wiki_path, orient="index")
-        return wiki_data
+            wiki_data = json.load(f)
+        # text 값 기준으로 중복 제거하여 반환
+        wiki_unique = {}
+        for v in wiki_data.values():
+            if v["text"] not in wiki_unique.keys():
+                wiki_unique[v["text"]] = v
+        return list(wiki_unique.values())
     else:
         print("⚠️지정한 경로에 wiki documents 파일이 존재하지 않습니다.")
         return None
@@ -103,7 +108,6 @@ def load_wiki():
 def load_tfidf_info(_config):
     tfidf_info_path = f"{_config.train.output_dir}/wiki_tfidf_info.json"
 
-    print("111")
     if os.path.exists(tfidf_info_path):
         with open(tfidf_info_path, "r", encoding="utf-8") as f:
             tfidf_info = json.load(f)
@@ -387,7 +391,7 @@ def main(config):
     # 위키 문서 살펴보기 탭
     # ================
     with tab3:
-        wiki_documents = load_wiki()
+        wiki_list = load_wiki()
         tfidf_infos = load_tfidf_info(config)
 
         # 한 페이지에 표시할 항목 개수 설정
@@ -396,8 +400,8 @@ def main(config):
         )
 
         # 전체 페이지 수 계산
-        total_document_pages = len(wiki_documents) // documents_per_page + (
-            1 if len(wiki_documents) % documents_per_page > 0 else 0
+        total_document_pages = len(wiki_list) // documents_per_page + (
+            1 if len(wiki_list) % documents_per_page > 0 else 0
         )
 
         # 현재 페이지 선택 슬라이더
@@ -408,25 +412,27 @@ def main(config):
         # 현재 페이지에 해당하는 데이터만 선택
         start_idx = (document_page - 1) * documents_per_page
         end_idx = start_idx + documents_per_page
-        selected_documents = wiki_documents.iloc[start_idx:end_idx]
+        selected_documents = wiki_list[start_idx:end_idx]
 
         # 현재 페이지의 데이터 출력
         st.write(f"### 현재 페이지: {document_page} / {total_document_pages}")
 
-        for idx, row in selected_documents.iterrows():
-            tfidf_info = tfidf_infos[str(idx)]
-            with st.expander(f"{row['document_id']}: {row['title']}"):
+        for idx, wiki_document in enumerate(selected_documents):
+            tfidf_info = tfidf_infos[str(start_idx + idx)]
+            with st.expander(
+                f"{wiki_document['document_id']}: {wiki_document['title']}"
+            ):
                 st.write(
-                    f"Domain: {row['domain']} | Corpus Source: {row['corpus_source']} | Author: {row['author']} html: {row['html']} | url: {row['url']}"
+                    f"Domain: {wiki_document['domain']} | Corpus Source: {wiki_document['corpus_source']} | Author: {wiki_document['author']} html: {wiki_document['html']} | url: {wiki_document['url']}"
                 )
 
                 c1, c2 = st.columns(2)
                 with c1:
                     st.subheader("Markdown")
-                    st.write(row["text"])
+                    st.write(wiki_document["text"])
                 with c2:
                     st.subheader("Raw text")
-                    st.text(row["text"])
+                    st.text(wiki_document["text"])
 
                 st.subheader("TF-IDF 점수 상위 10개 토큰")
                 tfidf_text = []
