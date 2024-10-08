@@ -1,10 +1,9 @@
-/data
-data/
-lightning_logs/
-outputs/
-test/
-tfidf/
-wandb/
+/lightning_logs
 __pycache__
-
+outputs/
+data/
+test/
+wandb/
+tfidf/
 tfidf.py
+checkpoints/
