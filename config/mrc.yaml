@@ -1,25 +1,25 @@
 data:
   data_module: MrcDataModule
-  dataset_name: [default]
+  dataset_name: [default] #default, klue_mrc, squad_kor_v1
   preprocessing_num_workers: 1
   max_seq_length: 384
   max_answer_length: 30
   doc_stride: 128
-  batch_size: 8
+  batch_size: 16
   n_best_size: 5
 
 model:
-  plm_name: sangrimlee/bert-base-multilingual-cased-korquad
+  plm_name: klue/bert-base
 
-metric: [squad]
+metric: [squad, bleu] #squad, bleu
 
 optimizer:
   name: AdamW
-  lr: 5e-5
+  lr: 0.000015
 
 train:
   output_dir: "outputs"
-  num_train_epochs: 1
+  num_train_epochs: 15
 
 wandb:
   enable: true

@@ -83,11 +83,11 @@ class TfIdfRetrieval:
         query_vector = self.vectorizer.transform(query)
         similarity = query_vector * self.sparse_embedding_matrix.T
         for i in range(len(query)):
-            sorted_idx = np.argsort(-similarity[i].data)
+            sorted_idx = np.argsort(similarity[i].data)[::-1]
             doc_scores.append(similarity[i].data[sorted_idx][:k])
-            docs.append(list(self.contexts[similarity.indices[sorted_idx][:k]]))
+            docs.append(list(self.contexts[similarity[i].indices[sorted_idx][:k]]))
 
-        return doc_scores, list(np.array(docs).squeeze())
+        return doc_scores, docs
 
 
 class DenseRetrieval(pl.LightningModule):
