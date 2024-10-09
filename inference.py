@@ -60,7 +60,7 @@ def main(config):
         doc_ids, docs = retrieval.search(test_examples["question"], k=top_k)
 
         # 3. insert retrieved context column
-        eval_examples = eval_examples.add_column(
+        test_examples = test_examples.add_column(
             "context", [" ".join(doc) for doc in docs]
         )
 
