@@ -1,6 +1,6 @@
 data:
   data_module: RetrievalDataModule
-  dataset_name: [klue_mrc, squad_kor_v1]
+  dataset_name: [default] #default, klue_mrc, squad_kor_v1
   preprocessing_num_workers: 1
   max_seq_length: 384
   batch_size: 4
@@ -12,7 +12,7 @@ model:
 
 loss: nll_loss
 
-metric: [accuracy, f1]
+metric: [accuracy, f1] #accuracy, f1
 
 optimizer:
   name: AdamW

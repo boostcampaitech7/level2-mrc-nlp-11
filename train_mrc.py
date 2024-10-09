@@ -40,7 +40,7 @@ def main(config):
     # 3. set trainer(=pl.Trainer) & train
     checkpoint_callback = ModelCheckpoint(
         dirpath="checkpoints",
-        filename="baseline-{epoch:02d}-{exact_match:.2f}",
+        filename="baseline_{epoch:02d}_{exact_match:.2f}",
         save_top_k=1,
         monitor="exact_match",
         mode="max",

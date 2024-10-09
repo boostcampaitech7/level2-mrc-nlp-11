@@ -57,7 +57,6 @@ def get_dataset_list(dataset_name_list):
 
 
 def default():
-
     current_directory = os.path.dirname(os.path.abspath(__file__))
     parent_directory = os.path.dirname(current_directory)
     url = "https://aistages-api-public-prod.s3.amazonaws.com/app/Competitions/000328/data/data.tar.gz"
