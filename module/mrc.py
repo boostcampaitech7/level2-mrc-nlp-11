@@ -29,6 +29,12 @@ class MrcLightningModule(pl.LightningModule):
         self.model = AutoModelForQuestionAnswering.from_pretrained(
             self.config.model.plm_name
         )
+        # model의 임베딩 크기 수정
+        if len(self.config.data.add_special_token) != 0:
+            self.model.resize_token_embeddings(
+                self.model.config.vocab_size + len(self.config.data.add_special_token)
+            )
+
         self.eval_dataset = eval_dataset
         self.test_dataset = test_dataset
         self.eval_examples = eval_examples

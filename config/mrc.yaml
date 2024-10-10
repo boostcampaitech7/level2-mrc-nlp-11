@@ -7,6 +7,8 @@ data:
   doc_stride: 128
   batch_size: 16
   n_best_size: 5
+  preproc_list: [test]
+  add_special_token: [<DOC>, <TEST>]
 
 model:
   plm_name: klue/bert-base
@@ -19,7 +21,7 @@ optimizer:
 
 train:
   output_dir: "outputs"
-  num_train_epochs: 15
+  num_train_epochs: 2
 
 wandb:
   enable: true

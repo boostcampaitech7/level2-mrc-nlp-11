@@ -6,6 +6,7 @@ from torch.utils.data import TensorDataset
 from transformers import AutoTokenizer, default_data_collator
 from datasets import load_dataset, load_from_disk, concatenate_datasets, DatasetDict
 from utils.data_template import get_dataset_list
+import utils.preprocessing as preproc_module
 
 
 class MrcDataModule(pl.LightningDataModule):
@@ -14,7 +15,11 @@ class MrcDataModule(pl.LightningDataModule):
         super().__init__()
         self.config = config
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.model.plm_name)
-
+        # tokenizer에 스페셜 토큰 추가
+        if len(self.config.data.add_special_token) != 0:
+            self.tokenizer.add_special_tokens(
+                {"additional_special_tokens": list(self.config.data.add_special_token)}
+            )
         self.train_dataset = None
         self.eval_dataset = None
         self.test_dataset = None
@@ -55,6 +60,11 @@ class MrcDataModule(pl.LightningDataModule):
             print(self.test_dataset)
 
     def get_dataset(self, examples, preprocess_func=None):
+        # 전처리하는 단계
+        for preproc in self.config.data.preproc_list:
+            examples.map(getattr(preproc_module, preproc))
+
+        # 모델 입력으로 들어갈 수 있게 변경한 단계
         return examples.map(
             (
                 self.prepare_validation_features
