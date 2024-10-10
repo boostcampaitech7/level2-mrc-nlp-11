@@ -9,9 +9,9 @@ import hydra
 @hydra.main(config_path="./config", config_name="combine", version_base=None)
 def main(config):
 
-    mode = "validation"
+    mode = "test"
     top_k = 5
-    only_mrc = False
+    only_mrc = True
     model_checkpoint = "/data/ephemeral/home/gj/level2-mrc-nlp-11/checkpoints/baseline_epoch=10_exact_match=55.42.ckpt"
 
     if mode == "validation":
@@ -23,7 +23,6 @@ def main(config):
             # 2. retrieve context
             retrieval = TfIdfRetrieval(config.retrieval)
             retrieval.fit()
-            retrieval.create_embedding_vector()
             doc_ids, docs = retrieval.search(eval_examples["question"], k=top_k)
 
             # 3. change original context to retrieved context
@@ -56,7 +55,6 @@ def main(config):
         # 2. retrieve context
         retrieval = TfIdfRetrieval(config.retrieval)
         retrieval.fit()
-        retrieval.create_embedding_vector()
         doc_ids, docs = retrieval.search(test_examples["question"], k=top_k)
 
         # 3. insert retrieved context column
