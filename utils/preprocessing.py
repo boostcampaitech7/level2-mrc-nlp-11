@@ -31,6 +31,7 @@ def title_context_merge(example):
     return example
 
 
+# 마크다운 패턴 제거 함수
 def remove_markdown(example):
     # 마크다운 패턴 리스트를 함수 내부에 포함
     markdown_patterns = {
@@ -57,6 +58,7 @@ def remove_markdown(example):
     return example
 
 
+# 마크다운 패턴별 스페셜 토큰 추가 함수
 def replace_markdown_with_tags(example):
     # 마크다운 패턴 리스트를 함수 내부에 포함
     markdown_patterns = {
@@ -87,6 +89,7 @@ def replace_markdown_with_tags(example):
     return example
 
 
+# 마크다운 패턴 <DOC> 스페셜 토큰 추가 함수
 def replace_markdown_with_doc(example):
     # 마크다운 패턴 리스트를 함수 내부에 포함
     markdown_patterns = {
