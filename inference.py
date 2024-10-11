@@ -10,9 +10,9 @@ import hydra
 def main(config):
 
     mode = "validation"
-    top_k = 5
-    only_mrc = False
-    model_checkpoint = "/data/ephemeral/home/gj/level2-mrc-nlp-11/checkpoints/baseline_epoch=10_exact_match=55.42.ckpt"
+    top_k = 10
+    only_mrc = True
+    model_checkpoint = "/data/ephemeral/home/sangyeop/exercise/level2-mrc-nlp-11/checkpoints/baseline_epoch=07_exact_match=59.58.ckpt"
 
     if mode == "validation":
         # 1. load eval examples

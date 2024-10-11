@@ -53,6 +53,7 @@ def main(config):
         callbacks=[checkpoint_callback],
         log_every_n_steps=1,
         logger=logger,
+        precision='16-true'
     )
     trainer.fit(model=model_module, datamodule=data_module)
 

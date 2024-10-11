@@ -40,10 +40,10 @@ class MrcDataModule(pl.LightningDataModule):
 
             self.train_examples = datasets["train"]
             self.eval_examples = datasets["validation"]
-            self.train_dataset = self.get_dataset(
+            self.train_dataset, self.train_examples = self.get_dataset(
                 self.train_examples, self.prepare_train_features
             )
-            self.eval_dataset = self.get_dataset(
+            self.eval_dataset, self.eval_examples = self.get_dataset(
                 self.eval_examples, self.prepare_validation_features
             )
             print(self.train_dataset)
@@ -54,27 +54,26 @@ class MrcDataModule(pl.LightningDataModule):
             self.test_examples = concatenate_datasets(
                 [ds["test"] for ds in dataset_list]
             )
-            self.test_dataset = self.get_dataset(
+            self.test_dataset, self.test_examples = self.get_dataset(
                 self.test_examples, self.prepare_validation_features
             )
             print(self.test_dataset)
-
-    def get_dataset(self, examples, preprocess_func=None):
-        # 전처리하는 단계
+    def preprocessing(self, examples):
         for preproc in self.config.data.preproc_list:
-            examples.map(getattr(preproc_module, preproc))
+            examples = examples.map(getattr(preproc_module, preproc))
+        return examples
+    def get_dataset(self, examples, feat_func=None):
+        # 전처리하는 단계
+        examples = self.preprocessing(examples)
 
         # 모델 입력으로 들어갈 수 있게 변경한 단계
-        return examples.map(
-            (
-                self.prepare_validation_features
-                if not preprocess_func
-                else preprocess_func
-            ),
+        dataset = examples.map(
+            (self.prepare_validation_features if not feat_func else feat_func),
             batched=True,
             num_proc=self.config.data.preprocessing_num_workers,
             remove_columns=examples.column_names,
         )
+        return dataset, examples
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(
