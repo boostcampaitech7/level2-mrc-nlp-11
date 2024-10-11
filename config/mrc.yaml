@@ -7,8 +7,8 @@ data:
   doc_stride: 128
   batch_size: 16
   n_best_size: 5
-  preproc_list: [replace_markdown_with_tags]
-  add_special_token: [<DOC>, <TEST>, <TITLE>, <TITLE_END>, <HEADER>, <LIST>, <BOLD>, <ITALIC>, <CODE_BLOCK>, <INLINE_CODE>]
+  preproc_list: [replace_markdown_with_doc]
+  add_special_token: [<DOC>, <TEST>, <TITLE>, <TITLE_END>, <HEADER>, <LIST>, <BOLD>, <ITALIC>]
 
 model:
   plm_name: klue/bert-base

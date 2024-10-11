@@ -38,8 +38,6 @@ def remove_markdown(example):
         "list": r"^\s*[\*\-\+]\s+",  # 리스트 기호 제거 (ex: *, -, +) - 줄 시작에서 리스트 기호를 찾아 제거
         "bold": r"\*\*(.*?)\*\*",  # 굵게 (ex: **굵게**) 텍스트만 남김
         "italic": r"\*(.*?)\*",  # 기울임 (ex: *기울임*) 텍스트만 남김
-        "code_block": r"```(.*?)```",  # 코드 블록 (ex: ```코드```)
-        "inline_code": r"`(.*?)`",  # 인라인 코드 (ex: `코드`)
     }
 
     # 마크다운 문법에 해당하는 부분을 제거하거나 변환하는 과정
@@ -49,9 +47,6 @@ def remove_markdown(example):
             example["context"] = re.sub(pattern, r"\2", example["context"])
         elif pattern_name == "bold" or pattern_name == "italic":
             # 굵게, 기울임은 텍스트만 남김
-            example["context"] = re.sub(pattern, r"\1", example["context"])
-        elif pattern_name == "code_block" or pattern_name == "inline_code":
-            # 코드 블록과 인라인 코드는 그대로 남김
             example["context"] = re.sub(pattern, r"\1", example["context"])
         else:
             # 나머지 마크다운 문법에 해당하는 부분은 제거
@@ -81,14 +76,6 @@ def replace_markdown_with_tags(example):
             r"\*(.*?)\*",
             r"<ITALIC>\1<ITALIC>",
         ),  # 기울임 (ex: *기울임*) - 기울임 텍스트 유지하고 <italic>
-        "code_block": (
-            r"```(.*?)```",
-            r"<CODE_BLOCK>\1<CODE_BLOCK>",
-        ),  # 코드 블록 (ex: ```코드```) - 코드 블록 유지하고 <code_block>
-        "inline_code": (
-            r"`(.*?)`",
-            r"<INLINE_CODE>\1<INLINE_CODE>",
-        ),  # 인라인 코드 (ex: `코드`) - 코드 텍스트 유지하고 <inline_code>
     }
 
     # 각 마크다운 문법에 해당하는 부분을 태그로 대체하는 과정
@@ -107,8 +94,6 @@ def replace_markdown_with_doc(example):
         "list": r"^\s*[\*\-\+]\s+(.+)",  # 리스트 (ex: *, -, +)
         "bold": r"\*\*(.*?)\*\*",  # 굵게 (ex: **굵게**)
         "italic": r"\*(.*?)\*",  # 기울임 (ex: *기울임*)
-        "code_block": r"```(.*?)```",  # 코드 블록 (ex: ```코드```)
-        "inline_code": r"`(.*?)`",  # 인라인 코드 (ex: `코드`)
     }
 
     # 각 마크다운 문법에 해당하는 부분을 <DOC>로 대체하는 과정
