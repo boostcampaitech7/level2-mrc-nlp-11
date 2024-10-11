@@ -98,3 +98,35 @@ def replace_markdown_with_tags(example):
         )  # 패턴에 해당하는 부분을 태그로 대체
 
     return example
+
+
+def replace_markdown_with_doc(example):
+    # 마크다운 패턴 리스트를 함수 내부에 포함
+    markdown_patterns = {
+        "header": r"^\s*(#{1,6})\s*(.+)",  # 헤더 (ex: #, ##, ###, ...)
+        "list": r"^\s*[\*\-\+]\s+(.+)",  # 리스트 (ex: *, -, +)
+        "bold": r"\*\*(.*?)\*\*",  # 굵게 (ex: **굵게**)
+        "italic": r"\*(.*?)\*",  # 기울임 (ex: *기울임*)
+        "code_block": r"```(.*?)```",  # 코드 블록 (ex: ```코드```)
+        "inline_code": r"`(.*?)`",  # 인라인 코드 (ex: `코드`)
+    }
+
+    # 각 마크다운 문법에 해당하는 부분을 <DOC>로 대체하는 과정
+    for pattern_name, pattern in markdown_patterns.items():
+        if pattern_name == "header":
+            # 헤더는 두 번째 그룹만 감싸서 처리
+            example["context"] = re.sub(
+                pattern, r"<DOC>\2", example["context"], flags=re.MULTILINE
+            )
+        elif pattern_name == "list":
+            # 리스트는 두 번째 그룹만 감싸서 처리
+            example["context"] = re.sub(
+                pattern, r"<DOC>\1", example["context"], flags=re.MULTILINE
+            )
+        else:
+            # 나머지 패턴은 첫 번째 그룹만 감싸서 처리
+            example["context"] = re.sub(
+                pattern, r"<DOC>\1<DOC>", example["context"], flags=re.MULTILINE
+            )
+
+    return example
