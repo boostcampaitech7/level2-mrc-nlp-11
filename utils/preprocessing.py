@@ -1,3 +1,3 @@
 def test(example):
-    example["context"] = example["context"].replace("\n", " ")
+    example["context"] = example["context"].replace(" ", "")
     return example
