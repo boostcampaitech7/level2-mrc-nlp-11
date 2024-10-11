@@ -58,10 +58,12 @@ class MrcDataModule(pl.LightningDataModule):
                 self.test_examples, self.prepare_validation_features
             )
             print(self.test_dataset)
+
     def preprocessing(self, examples):
         for preproc in self.config.data.preproc_list:
             examples = examples.map(getattr(preproc_module, preproc))
         return examples
+
     def get_dataset(self, examples, feat_func=None):
         # 전처리하는 단계
         examples = self.preprocessing(examples)

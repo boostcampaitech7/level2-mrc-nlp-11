@@ -34,13 +34,15 @@ def main(config):
 
         # 4. make eval_dataset & eval_dataloader
         data_module = MrcDataModule(config.mrc)
-        data_module.eval_dataset = data_module.get_dataset(eval_examples)
+        data_module.eval_dataset, preproc_eval_examples = data_module.get_dataset(
+            eval_examples
+        )
         val_dataloader = data_module.val_dataloader()
 
         # 5. load mrc model
         mrc = MrcLightningModule.load_from_checkpoint(model_checkpoint)
         # 5.1. put eval examples and eval dataset to inference
-        mrc.eval_examples = eval_examples
+        mrc.eval_examples = preproc_eval_examples
         mrc.eval_dataset = data_module.eval_dataset
 
         # 6. inference eval dataset
@@ -66,13 +68,15 @@ def main(config):
 
         # 4. make eval_dataset & eval_dataloader
         data_module = MrcDataModule(config.mrc)
-        data_module.test_dataset = data_module.get_dataset(test_examples)
+        data_module.test_dataset, preproc_test_examples = data_module.get_dataset(
+            test_examples
+        )
         test_dataloader = data_module.test_dataloader()
 
         # 5. load mrc model
         mrc = MrcLightningModule.load_from_checkpoint(model_checkpoint)
         # 5.1. put eval examples and eval dataset to inference
-        mrc.test_examples = test_examples
+        mrc.test_examples = preproc_test_examples
         mrc.test_dataset = data_module.test_dataset
 
         # 6. inference eval dataset

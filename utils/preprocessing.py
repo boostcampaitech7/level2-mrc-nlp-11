@@ -1,3 +1,16 @@
+"""
+STANDARD DATA FORMAT
+{
+    'id': Value(dtype='string', id=None),
+    'title': Value(dtype='string', id=None),
+    'context': Value(dtype='string', id=None),
+    'question': Value(dtype='string', id=None),
+    'answers': Sequence(feature={
+        'text': Value(dtype='string', id=None),
+        'answer_start': Value(dtype='int32', id=None)
+    }, length=-1, id=None)
+}
+"""
 from functools import wraps
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -65,13 +78,13 @@ def test(example):
     example["context"] = example["context"].replace("\n", " ")
     return example
 
-# 사용 예시
-# 예제 데이터 생성
-# example = {
-#     "question": "이것은 예제 질문입니다. ",
-#     "context": "이것은 예제 컨텍스트입니다.\n새로운 줄입니다."
-# }
 
-# # 함수 호출
-# processed_example = categorize_question(example)
-# print(processed_example)
+def title_context_merge(example):
+    # 제목을 강조하기 위해 특정 토큰을 추가합니다.
+    title = f"<TITLE> {example['title']} <TITLE_END> "
+    for idx in range(len(example["answers"]["answer_start"])):
+        example["answers"]["answer_start"][idx] = example["answers"]["answer_start"][
+            idx
+        ] + len(title)
+    example["context"] = f"{title}{example['context']}"
+    return example

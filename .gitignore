@@ -8,3 +8,5 @@ tfidf/
 tfidf.py
 checkpoints/
 .cz.yaml
+sr_inference.py
+bm25/
