@@ -72,7 +72,6 @@ def remove_markdown(example):
 
     # 마크다운을 제거한 후 새로운 문맥을 토큰화
     new_tokens = tokenizer(example["context"])["input_ids"]
-    print(new_tokens[223])
 
     # 답변 시작 토큰이 같은 토큰값의 인덱스들을 찾음
     new_indices = [i for i, token in enumerate(new_tokens) if token == answer_token]
@@ -88,6 +87,21 @@ def remove_markdown(example):
 
 # 마크다운 패턴별 스페셜 토큰 추가 함수
 def replace_markdown_with_tags(example):
+    # 원본 문맥과 answer_start 저장
+    original_context = example["context"]
+    original_answer_start = example["answers"]["answer_start"][0]
+
+    tokenizer = BertTokenizerFast.from_pretrained("klue/bert-base")
+
+    # 원본 문맥을 토큰화
+    original_tokens = tokenizer(original_context)["input_ids"]
+
+    # 답변 시작 텍스트 토큰화 결과 저장
+    answer_token = original_tokens[original_answer_start]
+
+    # 답변 시작 토큰이 같은 토큰값 중 몇 번째 인덱스에 위치하는지 저장
+    original_index = find_target_index(original_tokens, answer_token)
+
     # 마크다운 패턴 리스트를 함수 내부에 포함
     markdown_patterns = {
         "header": (
@@ -105,6 +119,18 @@ def replace_markdown_with_tags(example):
         example["context"] = re.sub(
             pattern, replacement, example["context"], flags=re.MULTILINE
         )  # 패턴에 해당하는 부분을 태그로 대체
+
+    # 마크다운을 제거한 후 새로운 문맥을 토큰화
+    new_tokens = tokenizer(example["context"])["input_ids"]
+
+    # 답변 시작 토큰이 같은 토큰값의 인덱스들을 찾음
+    new_indices = [i for i, token in enumerate(new_tokens) if token == answer_token]
+
+    # original_index번째 값을 example['answers']['answer_start']에 저장
+    if original_index < len(new_indices):
+        example["answers"]["answer_start"] = new_indices[original_index]
+    else:
+        example["answers"]["answer_start"] = None  # 또는 예외 처리
 
     return example
 
