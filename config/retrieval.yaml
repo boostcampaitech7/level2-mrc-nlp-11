@@ -24,7 +24,7 @@ train:
 
 wandb:
   enable: true
-  project: test
+  project: normalize_wiki
 
 device: cuda
 

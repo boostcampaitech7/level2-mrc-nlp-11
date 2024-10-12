@@ -1,11 +1,11 @@
 #!/bin/bash
 
-HUGGINGFACE_TOKEN=""
-PROJECT_NAME="test"
+HUGGINGFACE_TOKEN="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"
+PROJECT_NAME="wiki_normalize"
 SWEEP_CONFIG="./config/mrc_sweep.yaml"
 COUNT=2
 
-use_sweep=true
+use_sweep=false
 
 # 1. Check huggingface-cli login status
 login_status=$(huggingface-cli whoami)

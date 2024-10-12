@@ -25,6 +25,6 @@ train:
 
 wandb:
   enable: true
-  project: Mrc baseline
+  project: normalize_wiki
 
 device: cuda
