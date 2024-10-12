@@ -1,4 +1,5 @@
 import collections, json, logging, os
+from collections import defaultdict
 from typing import Optional, Tuple
 from tqdm.auto import tqdm
 import numpy as np
@@ -20,7 +21,7 @@ import torch.nn.functional as F
 import torchmetrics
 import module.loss as module_loss
 from utils.common import init_obj
-import rank_bm25
+from utils import rank_bm25
 import konlpy.tag as morphs_analyzer
 
 from utils.data_template import get_dataset_list
@@ -107,16 +108,101 @@ class Bm25Retrieval:
         for q in query:
             tokenized_query_list.append(self.tokenize_func(q))
 
-        docs_score, docs = [], []
+        docs_score, docs, docs_idx, q_score_list = [], [], [], []
         for tokenized_query in tokenized_query_list:
-            doc_scores = self.bm25.get_scores(tokenized_query)
+            doc_scores, q_scores = self.bm25.get_scores(tokenized_query)
             sorted_idx = np.argsort(doc_scores)[::-1]
+            docs_idx.append(sorted_idx[:k])
             docs_score.append(doc_scores[sorted_idx][:k])
+            q_score_list.append(q_scores)
+            """
+            for key, value in q_scores.items():
+                q_scores[key] = value[sorted_idx][:k]
+            """
             docs.append([self.contexts[idx] for idx in sorted_idx[:k]])
 
-        return docs_score, docs
+        return docs_score, docs, docs_idx, q_score_list
 
 
+class TfIdfRetrieval:
+
+    def __init__(self, config):
+        self.config = config
+        self.contexts = self.prepare_contexts()
+        self.tokenizer = AutoTokenizer.from_pretrained(self.config.tfidf.tokenizer)
+        self.vectorizer = TfidfVectorizer(
+            tokenizer=self.tokenizer.tokenize, ngram_range=(1, 1), max_features=50000
+        )
+        self.sparse_embedding_matrix = None
+
+    def prepare_contexts(self):
+        parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        context_data_path = f"{parent_directory}/{self.config.tfidf.data_path}"
+
+        with open(context_data_path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+        return np.array(list(dict.fromkeys([v["text"] for v in data.values()])))
+
+    def fit(self):
+        parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        tfidf_save_dir = f"{parent_directory}/tfidf/"
+        tfidf_model_path = (
+            tfidf_save_dir
+            + f"model_tokenizer={self.config.tfidf.tokenizer}_ngram={self.config.tfidf.ngram}".replace(
+                "/", "-"
+            )
+        )
+        tfidf_embed_path = (
+            tfidf_save_dir
+            + f"embed_tokenizer={self.config.tfidf.tokenizer}_ngram={self.config.tfidf.ngram}".replace(
+                "/", "-"
+            )
+        )
+
+        # 1. load model and matrix
+        if os.path.isfile(tfidf_model_path) and os.path.isfile(tfidf_embed_path):
+            with open(tfidf_model_path, "rb") as file:
+                self.vectorizer = pickle.load(file)
+            with open(tfidf_embed_path, "rb") as file:
+                self.sparse_embedding_matrix = pickle.load(file)
+        # 2. create model and matrix
+        else:
+            self.sparse_embedding_matrix = self.vectorizer.fit_transform(self.contexts)
+
+            # save model and matrix
+            if not os.path.isdir(tfidf_save_dir):
+                os.makedirs(tfidf_save_dir)
+            with open(tfidf_model_path, "wb") as file:
+                pickle.dump(self.vectorizer, file)
+            with open(tfidf_embed_path, "wb") as file:
+                pickle.dump(self.sparse_embedding_matrix, file)
+
+    def search(self, query, k=1):
+        if isinstance(query, str):
+            query = [query]
+
+        doc_scores, docs, docs_idx = [], [], []
+        query_vector = self.vectorizer.transform(query)
+        similarity = query_vector * self.sparse_embedding_matrix.T
+        for i in range(len(query)):
+            sorted_idx = np.argsort(similarity[i].data)[::-1]
+            doc_scores.append(similarity[i].data[sorted_idx][:k])
+            docs.append(list(self.contexts[similarity[i].indices[sorted_idx][:k]]))
+            docs_idx.append(similarity[i].indices[sorted_idx][:k])
+
+        q_score_list = []
+        vocab = sorted(self.vectorizer.vocabulary_.keys())
+        sparse_embedding_matrix = self.sparse_embedding_matrix.toarray()
+        for q in query_vector:
+            q_scores = defaultdict(lambda: np.zeros(sparse_embedding_matrix.shape[0]))
+            for idx, data in zip(q.indices, q.data):
+                q_scores[vocab[idx]] += data * sparse_embedding_matrix[:, idx]
+            q_score_list.append(q_scores)
+
+        return doc_scores, docs, docs_idx, q_score_list
+
+
+"""
 class TfIdfRetrieval:
 
     def __init__(self, config):
@@ -160,15 +246,11 @@ class TfIdfRetrieval:
         tfidf_save_dir = f"{parent_directory}/tfidf/"
         tfidf_model_path = (
             tfidf_save_dir
-            + f"model_{self.config.tfidf.tokenizer}_ngram={self.config.tfidf.ngram}".replace(
-                "/", "-"
-            )
+            + f"model_{self.config.tfidf.tokenizer}_ngram={self.config.tfidf.ngram}".replace("/", "-")
         )
         tfidf_embed_path = (
             tfidf_save_dir
-            + f"embed_{self.config.tfidf.tokenizer}_ngram={self.config.tfidf.ngram}".replace(
-                "/", "-"
-            )
+            + f"embed_{self.config.tfidf.tokenizer}_ngram={self.config.tfidf.ngram}".replace("/", "-")
         )
 
         # 1. load model and matrix
@@ -220,6 +302,7 @@ class TfIdfRetrieval:
             docs.append(list(self.contexts[similarity[i].indices[sorted_idx][:k]]))
 
         return doc_scores, docs
+"""
 
 
 class DenseRetrieval(pl.LightningModule):
