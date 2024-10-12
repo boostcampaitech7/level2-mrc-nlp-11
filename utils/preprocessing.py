@@ -35,25 +35,15 @@ def title_context_merge(example):
 def remove_markdown(example):
     # 마크다운 패턴 리스트를 함수 내부에 포함
     markdown_patterns = {
-        "header": r"(?:^|\n)#{1,6}\s*",  # 헤더 (ex: #, ##, ###, ...) - 줄 시작 또는 줄바꿈 후 처리
-        "list": r"^\s*[\*\-\+]\s+",  # 리스트 기호 제거 (ex: *, -, +) - 줄 시작에서 리스트 기호를 찾아 제거
-        "bold": r"\*\*(.*?)\*\*",  # 굵게 (ex: **굵게**) 텍스트만 남김
-        "italic": r"\*(.*?)\*",  # 기울임 (ex: *기울임*) 텍스트만 남김
+        "header": r"(?:^|\n{1,2})#{1,6}\s*",  # 헤더 (1~2번의 줄바꿈 허용)
+        "list": r"(?:\\n|\\n\\n|\n|\n\n)\s*[*+-]{1,}\s+",  # 리스트 기호 탐지 (\\n, \n, 공백 허용)
     }
 
-    # 마크다운 문법에 해당하는 부분을 제거하거나 변환하는 과정
+    # 마크다운 문법에 해당하는 부분을 제거
     for pattern_name, pattern in markdown_patterns.items():
-        if pattern_name == "link":
-            # 링크 패턴에 대해서는 링크만 남기고 텍스트는 제거
-            example["context"] = re.sub(pattern, r"\2", example["context"])
-        elif pattern_name == "bold" or pattern_name == "italic":
-            # 굵게, 기울임은 텍스트만 남김
-            example["context"] = re.sub(pattern, r"\1", example["context"])
-        else:
-            # 나머지 마크다운 문법에 해당하는 부분은 제거
-            example["context"] = re.sub(
-                pattern, "", example["context"], flags=re.MULTILINE
-            )
+        example["context"] = re.sub(
+            pattern, " ", example["context"], flags=re.MULTILINE
+        )
 
     return example
 
@@ -63,21 +53,13 @@ def replace_markdown_with_tags(example):
     # 마크다운 패턴 리스트를 함수 내부에 포함
     markdown_patterns = {
         "header": (
-            r"^\s*(#{1,6})\s*(.+)",
-            r"<HEADER>\2",
+            r"(?:^|\n{1,2})#{1,6}\s*",
+            r"<HEADER>",
         ),  # 헤더 (ex: #, ##, ###, ...) - <header>로 대체
         "list": (
-            r"^\s*[\*\-\+]\s+(.+)",
-            r"<LIST>\1",
+            r"(?:\\n|\\n\\n|\n|\n\n)\s*[*+-]{1,}\s+",
+            r"<LIST>",
         ),  # 리스트 (ex: *, -, +) - 리스트 기호 제거하고 <list>로 대체
-        "bold": (
-            r"\*\*(.*?)\*\*",
-            r"<BOLD>\1<BOLD>",
-        ),  # 굵게 (ex: **굵게**) - 굵게 텍스트 유지하고 <bold>
-        "italic": (
-            r"\*(.*?)\*",
-            r"<ITALIC>\1<ITALIC>",
-        ),  # 기울임 (ex: *기울임*) - 기울임 텍스트 유지하고 <italic>
     }
 
     # 각 마크다운 문법에 해당하는 부분을 태그로 대체하는 과정
@@ -93,10 +75,8 @@ def replace_markdown_with_tags(example):
 def replace_markdown_with_doc(example):
     # 마크다운 패턴 리스트를 함수 내부에 포함
     markdown_patterns = {
-        "header": r"^\s*(#{1,6})\s*(.+)",  # 헤더 (ex: #, ##, ###, ...)
-        "list": r"^\s*[\*\-\+]\s+(.+)",  # 리스트 (ex: *, -, +)
-        "bold": r"\*\*(.*?)\*\*",  # 굵게 (ex: **굵게**)
-        "italic": r"\*(.*?)\*",  # 기울임 (ex: *기울임*)
+        "header": r"(?:^|\n{1,2})#{1,6}\s*",  # 헤더 (ex: #, ##, ###, ...)
+        "list": r"(?:\\n|\\n\\n|\n|\n\n)\s*[*+-]{1,}\s+",  # 리스트 (ex: *, -, +)
     }
 
     # 각 마크다운 문법에 해당하는 부분을 <DOC>로 대체하는 과정
@@ -104,17 +84,12 @@ def replace_markdown_with_doc(example):
         if pattern_name == "header":
             # 헤더는 두 번째 그룹만 감싸서 처리
             example["context"] = re.sub(
-                pattern, r"<DOC>\2", example["context"], flags=re.MULTILINE
+                pattern, r"<DOC>", example["context"], flags=re.MULTILINE
             )
         elif pattern_name == "list":
             # 리스트는 두 번째 그룹만 감싸서 처리
             example["context"] = re.sub(
-                pattern, r"<DOC>\1", example["context"], flags=re.MULTILINE
-            )
-        else:
-            # 나머지 패턴은 첫 번째 그룹만 감싸서 처리
-            example["context"] = re.sub(
-                pattern, r"<DOC>\1<DOC>", example["context"], flags=re.MULTILINE
+                pattern, r"<DOC>", example["context"], flags=re.MULTILINE
             )
 
     return example
