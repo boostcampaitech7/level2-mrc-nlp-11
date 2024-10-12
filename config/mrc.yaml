@@ -7,8 +7,8 @@ data:
   doc_stride: 128
   batch_size: 16
   n_best_size: 5
-  preproc_list: [test]
-  add_special_token: [<DOC>, <TEST>]
+  preproc_list: [title_context_merge]
+  add_special_token: [<DOC>, <TEST>, <TITLE>, <TITLE_END>]
 
 model:
   plm_name: klue/bert-base
