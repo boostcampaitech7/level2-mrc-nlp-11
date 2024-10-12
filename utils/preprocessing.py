@@ -32,6 +32,15 @@ def title_context_merge(example):
     return example
 
 
+# 답변 시작 토큰과 같은 토큰값 중 답변 시작 토큰의 인덱스 저장 함수
+def find_target_index(tokens, target_token):
+    occurrence_index = 0
+    for i in range(len(tokens)):
+        if tokens[i] == target_token:
+            occurrence_index += 1
+    return occurrence_index - 1
+
+
 # 마크다운 패턴 제거 함수
 def remove_markdown(example):
     # 원본 문맥과 answer_start 저장
@@ -42,7 +51,6 @@ def remove_markdown(example):
 
     # 원본 문맥을 토큰화
     original_tokens = tokenizer(original_context)["input_ids"]
-    print(original_tokens[226])
 
     # 답변 시작 텍스트 토큰화 결과 저장
     answer_token = original_tokens[original_answer_start]
