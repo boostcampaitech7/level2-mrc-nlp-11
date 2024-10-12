@@ -111,15 +111,8 @@ def replace_markdown_with_doc(example):
 
     # 각 마크다운 문법에 해당하는 부분을 <DOC>로 대체하는 과정
     for pattern_name, pattern in markdown_patterns.items():
-        if pattern_name == "header":
-            # 헤더는 두 번째 그룹만 감싸서 처리
-            example["context"] = re.sub(
-                pattern, r"<DOC>", example["context"], flags=re.MULTILINE
-            )
-        elif pattern_name == "list":
-            # 리스트는 두 번째 그룹만 감싸서 처리
-            example["context"] = re.sub(
-                pattern, r"<DOC>", example["context"], flags=re.MULTILINE
-            )
+        example["context"] = re.sub(
+            pattern, r"<DOC>", example["context"], flags=re.MULTILINE
+        )
 
     return example
