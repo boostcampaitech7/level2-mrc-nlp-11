@@ -163,17 +163,20 @@ class BM25L(BM25):
     def get_scores(self, query):
         score = np.zeros(self.corpus_size)
         doc_len = np.array(self.doc_len)
+        q_scores = defaultdict(lambda: np.zeros(self.corpus_size))
         for q in query:
             q_freq = np.array([(doc.get(q) or 0) for doc in self.doc_freqs])
             ctd = q_freq / (1 - self.b + self.b * doc_len / self.avgdl)
-            score += (
+            q_score = (
                 (self.idf.get(q) or 0)
                 * q_freq
                 * (self.k1 + 1)
                 * (ctd + self.delta)
                 / (self.k1 + ctd + self.delta)
             )
-        return score
+            q_scores[q] += q_score
+            score += q_score
+        return score, q_scores
 
     def get_batch_scores(self, query, doc_ids):
         """
@@ -211,14 +214,18 @@ class BM25Plus(BM25):
     def get_scores(self, query):
         score = np.zeros(self.corpus_size)
         doc_len = np.array(self.doc_len)
+        q_scores = defaultdict(lambda: np.zeros(self.corpus_size))
+
         for q in query:
             q_freq = np.array([(doc.get(q) or 0) for doc in self.doc_freqs])
-            score += (self.idf.get(q) or 0) * (
+            q_score = (self.idf.get(q) or 0) * (
                 self.delta
                 + (q_freq * (self.k1 + 1))
                 / (self.k1 * (1 - self.b + self.b * doc_len / self.avgdl) + q_freq)
             )
-        return score
+            q_scores[q] += q_score
+            score += q_score
+        return score, q_scores
 
     def get_batch_scores(self, query, doc_ids):
         """

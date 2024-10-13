@@ -1,127 +1,185 @@
-import collections, json, logging, os
+import json, os, pickle
 from collections import defaultdict
-from typing import Optional, Tuple
-from tqdm.auto import tqdm
 import numpy as np
 import torch
-import pytorch_lightning as pl
-from transformers import (
-    AutoModelForQuestionAnswering,
-    EvalPrediction,
-    RobertaForQuestionAnswering,
-)
-from datasets import load_metric, load_dataset, Dataset
-from datasets import load_dataset, load_from_disk, concatenate_datasets, DatasetDict
-import pickle
-
-from sklearn.feature_extraction.text import TfidfVectorizer
-from transformers import AutoTokenizer, BertPreTrainedModel, BertModel
-from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 import torch.nn.functional as F
-import torchmetrics
+import pytorch_lightning as pl
+from datasets import concatenate_datasets
+from sklearn.feature_extraction.text import TfidfVectorizer
+from evaluate import load
+from transformers import AutoTokenizer
+import konlpy.tag as morphs_analyzer
+
 import module.loss as module_loss
 from utils.common import init_obj
 from utils import rank_bm25
-import konlpy.tag as morphs_analyzer
-
 from utils.data_template import get_dataset_list
-from evaluate import load
 from utils.common import init_obj
 import module.metric as module_metric
 
 
-def identity_func(x):
-    return x
+class MorphsBm25Retrieval:
+    def __init__(self, config):
+        self.config = config
+        self.analyzer = getattr(morphs_analyzer, self.config.analyzer_name)()
+        self.tag_set = self.get_tag_set()
+        self.bm25 = None
+        self.context = self.prepare_contexts()
+
+    def prepare_contexts(self, is_morphs_context=False):
+        parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        context_data_path = f"{parent_directory}/{self.config.data_path}"
+
+        with open(context_data_path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+
+        if is_morphs_context:
+            return list(dict.fromkeys([v["pos_text"] for v in data.values()]))
+        return list(dict.fromkeys([v["text"] for v in data.values()]))
+
+    def tokenize(self, context):
+        self.analyzer.pos(context)
+        tokenized_context = []
+        for token, pos in self.analyzer.pos(context):
+            if pos in self.tag_set:
+                continue
+            tokenized_context.append(token)
+        return tokenized_context
+
+    def get_tag_set(self):
+        if self.config.analyzer_name == "Kkma":
+            josa_tag_list = [
+                "JKS",
+                "JKC",
+                "JKG",
+                "JKO",
+                "JKM",
+                "JKI",
+                "JKQ",
+                "JC",
+                "JX",
+            ]
+            suffix_list = [
+                "EPH",
+                "EPT",
+                "EPP",
+                "EFN",
+                "EFQ",
+                "EFO",
+                "EFA",
+                "EFI",
+                "EFR",
+                "ECE",
+                "ECS",
+                "ECD",
+                "ETN",
+                "ETD",
+                "XSN",
+                "XSV",
+                "XSA",
+            ]
+            etc_list = ["IC", "SF", "SE", "SS", "SP", "SO"]
+            return set(josa_tag_list + suffix_list + etc_list)
+        return None
+
+    def fit(self):
+        morphs_contexts = self.prepare_contexts(is_morphs_context=True)
+        self.bm25 = getattr(rank_bm25, self.config.model)(morphs_contexts)
+
+    def save(self):
+        parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        bm25_save_dir = f"{parent_directory}/bm25/"
+        bm25_model_path = (
+            bm25_save_dir
+            + f"{self.config.model}_{self.config.analyzer_name}".replace("/", "-")
+        )
+        if not os.path.isdir(bm25_save_dir):
+            os.makedirs(bm25_save_dir)
+        with open(bm25_model_path, "wb") as file:
+            pickle.dump(self, file)
+
+    def search(self, query_list, k=1, return_query_score=False):
+        if isinstance(query_list, str):
+            query_list = [query_list]
+
+        tokenized_query_list = []
+        for query in query_list:
+            tokenized_query_list.append(self.tokenize(query))
+
+        docs_score, docs_idx, docs, query_score_list = [], [], [], []
+        for tokenized_query in tokenized_query_list:
+            doc_score, query_score = self.bm25.get_scores(tokenized_query)
+            sorted_idx = np.argsort(docs_score)[::-1]
+
+            docs_idx.append(sorted_idx[:k])
+            docs_score.append(doc_score[sorted_idx][:k])
+            docs.append([self.contexts[idx] for idx in sorted_idx[:k]])
+            if return_query_score:
+                query_score_list.append(query_score)
+
+        if not return_query_score:
+            return docs_score, docs_idx, docs
+
+        return docs_score, docs_idx, docs, query_score_list
 
 
-class Bm25Retrieval:
+class SubwordBm25Retrieval:
 
     def __init__(self, config):
         self.config = config
-        try:
-            self.tokenize_func = AutoTokenizer.from_pretrained(
-                self.config.bm25.tokenizer
-            ).tokenize
-        except Exception as e:
-            self.tokenize_func = getattr(
-                morphs_analyzer, self.config.bm25.tokenizer
-            )().morphs
-
+        self.tokenizer = AutoTokenizer.from_pretrained(self.config.tokenizer_name)
         self.bm25 = None
         self.contexts = self.prepare_contexts()
 
     def prepare_contexts(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        context_data_path = f"{parent_directory}/{self.config.bm25.data_path}"
+        context_data_path = f"{parent_directory}/{self.config.data_path}"
 
         with open(context_data_path, "r", encoding="utf-8") as file:
             data = json.load(file)
-
-        # case 1. pretrained model tokenizer
-        if self.tokenize_func.__name__ == "tokenize":
-            return list(dict.fromkeys([v["text"] for v in data.values()]))
-        # case 2. morphs analyzer
-        elif self.tokenize_func.__name__ == "morphs":
-            ST = {v["text"]: v["morphs_text"] for v in data.values()}
-            self.morphs_contexts = [morphs_text for morphs_text in ST.values()]
-            return [text for text in ST.keys()]
+        return list(dict.fromkeys([v["text"] for v in data.values()]))
 
     def fit(self):
+        tokenized_contexts = []
+        for context in self.contexts:
+            tokenized_contexts.append(self.tokenizer.tokenize(context))
+        self.bm25 = getattr(rank_bm25, self.config.model)(tokenized_contexts)
+
+    def save(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         bm25_save_dir = f"{parent_directory}/bm25/"
         bm25_model_path = (
             bm25_save_dir
-            + f"{self.config.bm25.model}_{self.config.bm25.tokenizer}".replace("/", "-")
+            + f"{self.config.model}_{self.config.tokenizer_name}".replace("/", "-")
         )
+        if not os.path.isdir(bm25_save_dir):
+            os.makedirs(bm25_save_dir)
+        with open(bm25_model_path, "wb") as file:
+            pickle.dump(self, file)
 
-        if os.path.isfile(bm25_model_path):
-            with open(bm25_model_path, "rb") as file:
-                self.bm25 = pickle.load(file)
-        else:
-            # case 1. pretrained model tokenizer
-            if self.tokenize_func.__name__ == "tokenize":
-                tokenized_contexts = []
-                for context in self.contexts:
-                    tokenized_contexts.append(self.tokenize_func(context))
-                self.bm25 = getattr(rank_bm25, self.config.bm25.model)(
-                    tokenized_contexts
-                )
-            # case 2. morphs analyzer
-            elif self.tokenize_func.__name__ == "morphs":
-                self.bm25 = getattr(rank_bm25, self.config.bm25.model)(
-                    self.morphs_contexts
-                )
-
-            if not os.path.isdir(bm25_save_dir):
-                os.makedirs(bm25_save_dir)
-            with open(bm25_model_path, "wb") as file:
-                pickle.dump(self.bm25, file)
-
-        if hasattr(self, "morphs_contexts"):
-            del self.morphs_contexts
-
-    def search(self, query, k=1):
-        if isinstance(query, str):
-            query = [query]
+    def search(self, query_list, k=1, return_query_score=False):
+        if isinstance(query_list, str):
+            query_list = [query_list]
 
         tokenized_query_list = []
-        for q in query:
-            tokenized_query_list.append(self.tokenize_func(q))
+        for query in query_list:
+            tokenized_query_list.append(self.tokenizer.tokenize(query))
 
-        docs_score, docs, docs_idx, q_score_list = [], [], [], []
+        docs_score, docs_idx, docs, query_score_list = [], [], [], []
         for tokenized_query in tokenized_query_list:
-            doc_scores, q_scores = self.bm25.get_scores(tokenized_query)
-            sorted_idx = np.argsort(doc_scores)[::-1]
+            doc_score, query_score = self.bm25.get_scores(tokenized_query)
+            sorted_idx = np.argsort(doc_score)[::-1]
+
             docs_idx.append(sorted_idx[:k])
-            docs_score.append(doc_scores[sorted_idx][:k])
-            q_score_list.append(q_scores)
-            """
-            for key, value in q_scores.items():
-                q_scores[key] = value[sorted_idx][:k]
-            """
+            docs_score.append(doc_score[sorted_idx][:k])
             docs.append([self.contexts[idx] for idx in sorted_idx[:k]])
+            if return_query_score:
+                query_score_list.append(query_score)
 
-        return docs_score, docs, docs_idx, q_score_list
+        if not return_query_score:
+            return docs_score, docs_idx, docs
+
+        return docs_score, docs_idx, docs, query_score_list
 
 
 class TfIdfRetrieval:
@@ -129,180 +187,70 @@ class TfIdfRetrieval:
     def __init__(self, config):
         self.config = config
         self.contexts = self.prepare_contexts()
-        self.tokenizer = AutoTokenizer.from_pretrained(self.config.tfidf.tokenizer)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.config.tokenizer_name)
         self.vectorizer = TfidfVectorizer(
-            tokenizer=self.tokenizer.tokenize, ngram_range=(1, 1), max_features=50000
-        )
-        self.sparse_embedding_matrix = None
-
-    def prepare_contexts(self):
-        parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        context_data_path = f"{parent_directory}/{self.config.tfidf.data_path}"
-
-        with open(context_data_path, "r", encoding="utf-8") as file:
-            data = json.load(file)
-        return np.array(list(dict.fromkeys([v["text"] for v in data.values()])))
-
-    def fit(self):
-        parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        tfidf_save_dir = f"{parent_directory}/tfidf/"
-        tfidf_model_path = (
-            tfidf_save_dir
-            + f"model_tokenizer={self.config.tfidf.tokenizer}_ngram={self.config.tfidf.ngram}".replace(
-                "/", "-"
-            )
-        )
-        tfidf_embed_path = (
-            tfidf_save_dir
-            + f"embed_tokenizer={self.config.tfidf.tokenizer}_ngram={self.config.tfidf.ngram}".replace(
-                "/", "-"
-            )
-        )
-
-        # 1. load model and matrix
-        if os.path.isfile(tfidf_model_path) and os.path.isfile(tfidf_embed_path):
-            with open(tfidf_model_path, "rb") as file:
-                self.vectorizer = pickle.load(file)
-            with open(tfidf_embed_path, "rb") as file:
-                self.sparse_embedding_matrix = pickle.load(file)
-        # 2. create model and matrix
-        else:
-            self.sparse_embedding_matrix = self.vectorizer.fit_transform(self.contexts)
-
-            # save model and matrix
-            if not os.path.isdir(tfidf_save_dir):
-                os.makedirs(tfidf_save_dir)
-            with open(tfidf_model_path, "wb") as file:
-                pickle.dump(self.vectorizer, file)
-            with open(tfidf_embed_path, "wb") as file:
-                pickle.dump(self.sparse_embedding_matrix, file)
-
-    def search(self, query, k=1):
-        if isinstance(query, str):
-            query = [query]
-
-        doc_scores, docs, docs_idx = [], [], []
-        query_vector = self.vectorizer.transform(query)
-        similarity = query_vector * self.sparse_embedding_matrix.T
-        for i in range(len(query)):
-            sorted_idx = np.argsort(similarity[i].data)[::-1]
-            doc_scores.append(similarity[i].data[sorted_idx][:k])
-            docs.append(list(self.contexts[similarity[i].indices[sorted_idx][:k]]))
-            docs_idx.append(similarity[i].indices[sorted_idx][:k])
-
-        q_score_list = []
-        vocab = sorted(self.vectorizer.vocabulary_.keys())
-        sparse_embedding_matrix = self.sparse_embedding_matrix.toarray()
-        for q in query_vector:
-            q_scores = defaultdict(lambda: np.zeros(sparse_embedding_matrix.shape[0]))
-            for idx, data in zip(q.indices, q.data):
-                q_scores[vocab[idx]] += data * sparse_embedding_matrix[:, idx]
-            q_score_list.append(q_scores)
-
-        return doc_scores, docs, docs_idx, q_score_list
-
-
-"""
-class TfIdfRetrieval:
-
-    def __init__(self, config):
-        self.config = config
-        try:
-            self.tokenize_func = AutoTokenizer.from_pretrained(
-                self.config.tfidf.tokenizer
-            ).tokenize
-        except Exception as e:
-            self.tokenize_func = getattr(
-                morphs_analyzer, self.config.tfidf.tokenizer
-            )().morphs
-
-        self.contexts = self.prepare_contexts()
-        self.vectorizer = TfidfVectorizer(
-            tokenizer=identity_func,
-            lowercase=False,
-            ngram_range=tuple(self.config.tfidf.ngram),
+            tokenizer=self.tokenizer.tokenize,
+            ngram_range=tuple(self.config.ngram),
             max_features=50000,
         )
         self.sparse_embedding_matrix = None
 
     def prepare_contexts(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        context_data_path = f"{parent_directory}/{self.config.tfidf.data_path}"
+        context_data_path = f"{parent_directory}/{self.config.data_path}"
 
         with open(context_data_path, "r", encoding="utf-8") as file:
             data = json.load(file)
-
-        # case 1. pretrained model tokenizer
-        if self.tokenize_func.__name__ == "tokenize":
-            return np.array(list(dict.fromkeys([v["text"] for v in data.values()])))
-        # case 2. morphs analyzer
-        elif self.tokenize_func.__name__ == "morphs":
-            ST = {v["text"]: v["morphs_text"] for v in data.values()}
-            self.morphs_contexts = [morphs_text for morphs_text in ST.values()]
-            return np.array([text for text in ST.keys()])
+        return np.array(list(dict.fromkeys([v["text"] for v in data.values()])))
 
     def fit(self):
+        self.sparse_embedding_matrix = self.vectorizer.fit_transform(self.contexts)
+
+    def save(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         tfidf_save_dir = f"{parent_directory}/tfidf/"
         tfidf_model_path = (
             tfidf_save_dir
-            + f"model_{self.config.tfidf.tokenizer}_ngram={self.config.tfidf.ngram}".replace("/", "-")
-        )
-        tfidf_embed_path = (
-            tfidf_save_dir
-            + f"embed_{self.config.tfidf.tokenizer}_ngram={self.config.tfidf.ngram}".replace("/", "-")
-        )
-
-        # 1. load model and matrix
-        if os.path.isfile(tfidf_model_path) and os.path.isfile(tfidf_embed_path):
-            with open(tfidf_model_path, "rb") as file:
-                self.vectorizer = pickle.load(file)
-            with open(tfidf_embed_path, "rb") as file:
-                self.sparse_embedding_matrix = pickle.load(file)
-        # 2. create model and matrix
-        else:
-            # case 1. pretrained model tokenizer
-            tokenized_contexts = []
-            if self.tokenize_func.__name__ == "tokenize":
-                for context in self.contexts:
-                    tokenized_contexts.append(self.tokenize_func(context))
-            # case 2. morphs analyzer
-            elif self.tokenize_func.__name__ == "morphs":
-                for morphs_context in self.morphs_contexts:
-                    tokenized_contexts.append(morphs_context)
-            self.sparse_embedding_matrix = self.vectorizer.fit_transform(
-                tokenized_contexts
+            + f"tokenizer={self.config.tokenizer_name}_ngram={self.config.ngram}".replace(
+                "/", "-"
             )
+        )
+        if not os.path.isdir(tfidf_save_dir):
+            os.makedirs(tfidf_save_dir)
+        with open(tfidf_model_path, "wb") as file:
+            pickle.dump(self, file)
 
-            # save model and matrix
-            if not os.path.isdir(tfidf_save_dir):
-                os.makedirs(tfidf_save_dir)
-            with open(tfidf_model_path, "wb") as file:
-                pickle.dump(self.vectorizer, file)
-            with open(tfidf_embed_path, "wb") as file:
-                pickle.dump(self.sparse_embedding_matrix, file)
+    def search(self, query_list, k=1, return_query_score=False):
+        if isinstance(query_list, str):
+            query_list = [query_list]
 
-        if hasattr(self, "morphs_contexts"):
-            del self.morphs_contexts
+        docs_score, docs_idx, docs = [], [], []
+        query_vector_list = self.vectorizer.transform(query_list)
+        similarity = query_vector_list * self.sparse_embedding_matrix.T
 
-    def search(self, query, k=1):
-        if isinstance(query, str):
-            query = [query]
-
-        tokenized_query_list = []
-        for q in query:
-            tokenized_query_list.append(self.tokenize_func(q))
-
-        doc_scores, docs = [], []
-        query_vector = self.vectorizer.transform(tokenized_query_list)
-        similarity = query_vector * self.sparse_embedding_matrix.T
-        for i in range(len(query)):
+        for i in range(len(query_list)):
             sorted_idx = np.argsort(similarity[i].data)[::-1]
-            doc_scores.append(similarity[i].data[sorted_idx][:k])
-            docs.append(list(self.contexts[similarity[i].indices[sorted_idx][:k]]))
+            doc_idx = similarity[i].indices[sorted_idx][:k]
+            doc_score = similarity[i].data[sorted_idx][:k]
 
-        return doc_scores, docs
-"""
+            docs.append(list(self.contexts[doc_idx]))
+            docs_idx.append(doc_idx)
+            docs_score.append(doc_score)
+
+        if not return_query_score:
+            return docs_score, docs_idx, docs
+
+        query_score_list = []
+        vocab = sorted(self.vectorizer.vocabulary_.keys())
+        sparse_embedding_matrix = self.sparse_embedding_matrix.toarray()
+
+        for query_vector in query_vector_list:
+            q_scores = defaultdict(lambda: np.zeros(sparse_embedding_matrix.shape[0]))
+            for idx, data in zip(query_vector.indices, query_vector.data):
+                q_scores[vocab[idx]] += data * sparse_embedding_matrix[:, idx]
+            query_score_list.append(q_scores)
+
+        return docs_score, docs_idx, docs, query_score_list
 
 
 class DenseRetrieval(pl.LightningModule):
