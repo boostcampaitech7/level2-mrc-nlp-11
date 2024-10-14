@@ -7,9 +7,8 @@ data:
   doc_stride: 128
   batch_size: 16
   n_best_size: 5
-  preproc_list: [title_context_merge]
-  add_special_token: [<DOC>, <TEST>, <TITLE>, <TITLE_END>]
-  remove_columns: [token_type_ids]
+  preproc_list: [replace_markdown_with_doc]
+  add_special_token: [<DOC>, <TEST>, <TITLE>, <TITLE_END>, <HEADER>, <LIST>]
 
 model:
   plm_name: uomnf97/klue-roberta-finetuned-korquad-v2 #klue/bert-base
@@ -18,14 +17,14 @@ metric: [squad, bleu] #squad, bleu
 
 optimizer:
   name: AdamW
-  lr: 0.000015
+  lr: 1.6764783497920226e-05
 
 train:
   output_dir: "outputs"
-  num_train_epochs: 2
+  num_train_epochs: 10
 
 wandb:
   enable: true
-  project: Mrc baseline
+  project: minseon
 
 device: cuda
