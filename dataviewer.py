@@ -117,31 +117,6 @@ def load_tfidf_info(_config):
         return None
 
 
-@st.cache_data
-def load_retrieved_documents(_config):
-    test_dataset_path = (
-        os.path.dirname(os.path.abspath(__file__))
-        + f"/data/default/test_dataset/validation"
-    )
-    retrieved_documents_path = f"{_config.train.output_dir}/retrieved_documents.json"
-
-    if os.path.exists(test_dataset_path):
-        test_dataset = load_from_disk(test_dataset_path)
-        test_dataset = test_dataset.to_pandas()
-    else:
-        print("⚠️지정한 경로에 데이터셋 파일이 존재하지 않습니다.")
-        test_dataset = None
-
-    if os.path.exists(retrieved_documents_path):
-        with open(retrieved_documents_path, "r", encoding="utf-8") as f:
-            retrieved_documents = json.load(f)
-    else:
-        print("⚠️지정한 경로에 retrieved documents 파일이 존재하지 않습니다.")
-        retrieved_documents = None
-
-    return test_dataset, retrieved_documents
-
-
 def view_QA(question_id, data, prediction):
     """
     선택한 질문-문서 페어를 보기 좋게 화면에 표시하는 함수입니다.
@@ -468,9 +443,6 @@ def main(config):
                         f"<div style='display:inline-block; font-size:14px; background-color:#c5cff6; border:1px solid #ddd; border-radius:5px; padding:1px 5px; margin:2px;'>{t}</div>: {round(score, 3)}"
                     )
                 st.markdown(", ".join(tfidf_text), unsafe_allow_html=True)
-
-    with tab4:
-        test_dataset, retrieved_documents = load_retrieved_documents(config)
 
 
 if __name__ == "__main__":
