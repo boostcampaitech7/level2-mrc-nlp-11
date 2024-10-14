@@ -13,6 +13,20 @@ def main(config):
     top_k = 10
     only_mrc = False
     model_checkpoint = "/data/ephemeral/home/gj/level2-mrc-nlp-11/checkpoints/baseline_epoch=01_exact_match=56.25.ckpt"
+    
+    '''# inference.py의 15번 줄 주석 처리 후 다음 코드 추가
+    # 1. 체크포인트 디렉토리 경로 예시
+    checkpoints_dir = "/data/ephemeral/home/level2-mrc-nlp-11/checkpoints" # 내 체크포인트 폴더의 경로로 변경하기
+    # 2. 최신 체크포인트 파일을 찾음
+    checkpoint_files = glob.glob(os.path.join(checkpoints_dir, "*.ckpt"))  # 모든 .ckpt 파일 찾기
+    if checkpoint_files:
+        # 가장 최근 체크포인트 파일
+        model_checkpoint = max(checkpoint_files, key=os.path.getctime)
+        print(f"Using model checkpoint: {model_checkpoint}")
+    else: # 3.체크 포인트가 존재하지 않으면 에러가 발생됨
+        raise FileNotFoundError("No checkpoint files found in the specified directory.")
+    '''
+    
 
     if mode == "validation":
         # 1. load eval examples
