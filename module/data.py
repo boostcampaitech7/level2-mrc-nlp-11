@@ -1,10 +1,10 @@
-import os
 import torch
 import numpy as np
 import pytorch_lightning as pl
 from torch.utils.data import TensorDataset
 from transformers import AutoTokenizer, default_data_collator
-from datasets import load_dataset, load_from_disk, concatenate_datasets, DatasetDict
+from datasets import concatenate_datasets, DatasetDict
+
 from utils.data_template import get_dataset_list
 import utils.preprocessing as preproc_module
 
@@ -37,7 +37,6 @@ class MrcDataModule(pl.LightningDataModule):
                 datasets[split] = concatenate_datasets(
                     [ds[split] for ds in dataset_list]
                 )
-
             self.train_examples = datasets["train"]
             self.eval_examples = datasets["validation"]
             self.train_dataset, self.train_examples = self.get_dataset(
@@ -50,7 +49,6 @@ class MrcDataModule(pl.LightningDataModule):
             print(self.eval_dataset)
 
         if stage == "test":
-            datasets = DatasetDict()
             self.test_examples = concatenate_datasets(
                 [ds["test"] for ds in dataset_list]
             )
@@ -79,7 +77,7 @@ class MrcDataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(
-            self.train_dataset,
+            self.train_dataset.remove_columns(self.config.data.remove_columns),
             batch_size=self.config.data.batch_size,
             collate_fn=default_data_collator,
             shuffle=True,
@@ -87,14 +85,18 @@ class MrcDataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         return torch.utils.data.DataLoader(
-            self.eval_dataset.remove_columns("offset_mapping"),
+            self.eval_dataset.remove_columns(
+                ["offset_mapping"] + self.config.data.remove_columns
+            ),
             collate_fn=default_data_collator,
             batch_size=self.config.data.batch_size,
         )
 
     def test_dataloader(self):
         return torch.utils.data.DataLoader(
-            self.test_dataset.remove_columns("offset_mapping"),
+            self.test_dataset.remove_columns(
+                ["offset_mapping"] + self.config.data.remove_columns
+            ),
             collate_fn=default_data_collator,
             batch_size=self.config.data.batch_size,
         )
