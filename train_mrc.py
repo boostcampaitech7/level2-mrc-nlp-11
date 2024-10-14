@@ -38,11 +38,11 @@ def main(config):
     )
 
     # 3. set trainer(=pl.Trainer) & train
+    run_name = "_".join([config.data.preproc_list[0], config.data.dataset_name[0]])
+
     checkpoint_callback = ModelCheckpoint(
         dirpath="checkpoints",
-        filename=config.run_name
-        + config.data.preproc_list[0]
-        + "_{epoch:02d}_{exact_match:.2f}",
+        filename=run_name + "_baseline_{epoch:02d}_{exact_match:.2f}",
         save_top_k=1,
         monitor="exact_match",
         mode="max",

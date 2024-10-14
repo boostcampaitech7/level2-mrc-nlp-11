@@ -29,8 +29,6 @@ def squad(mrc_preds, method):
 
     return {"exact_match": result["exact_match"], "f1": result["f1"]}
 
-    return result
-
 
 def bleu(mrc_preds, method):
     predictions = [pred["prediction_text"] for pred in mrc_preds.predictions]

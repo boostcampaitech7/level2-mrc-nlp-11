@@ -18,11 +18,11 @@ metric: [squad, bleu] #squad, bleu
 
 optimizer:
   name: AdamW
-  lr: 0.000015
+  lr: 1.6764783497920226e-05
 
 train:
   output_dir: "outputs"
-  num_train_epochs: 13
+  num_train_epochs: 10
 
 wandb:
   enable: true

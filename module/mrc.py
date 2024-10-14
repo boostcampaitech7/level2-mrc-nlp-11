@@ -388,9 +388,11 @@ class MrcLightningModule(pl.LightningModule):
             parent_directory = os.path.dirname(
                 os.path.dirname(os.path.abspath(__file__))
             )
+
             run_name = "_".join(
-                [self.config.run_name, self.config.data.preproc_list[0]]
+                [self.config.data.preproc_list[0], self.config.data.dataset_name[0]]
             )
+
             prediction_file = os.path.join(
                 parent_directory,
                 output_dir,
@@ -404,7 +406,7 @@ class MrcLightningModule(pl.LightningModule):
                 parent_directory,
                 output_dir,
                 (
-                    f"{run_name}_nbest_predictions.json"
+                    f"{run_name}_best_npredictions.json"
                     if prefix is None
                     else f"{run_name}_{prefix}_nbest_predictions.json"
                 ),
