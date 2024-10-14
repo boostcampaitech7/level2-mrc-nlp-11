@@ -77,7 +77,7 @@ class MrcDataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(
-            self.train_dataset,
+            self.train_dataset.remove_columns(self.config.data.remove_columns),
             batch_size=self.config.data.batch_size,
             collate_fn=default_data_collator,
             shuffle=True,
@@ -85,14 +85,18 @@ class MrcDataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         return torch.utils.data.DataLoader(
-            self.eval_dataset.remove_columns("offset_mapping"),
+            self.eval_dataset.remove_columns(
+                ["offset_mapping"] + self.config.data.remove_columns
+            ),
             collate_fn=default_data_collator,
             batch_size=self.config.data.batch_size,
         )
 
     def test_dataloader(self):
         return torch.utils.data.DataLoader(
-            self.test_dataset.remove_columns("offset_mapping"),
+            self.test_dataset.remove_columns(
+                ["offset_mapping"] + self.config.data.remove_columns
+            ),
             collate_fn=default_data_collator,
             batch_size=self.config.data.batch_size,
         )
