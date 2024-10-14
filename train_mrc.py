@@ -40,7 +40,7 @@ def main(config):
     )
 
     # 3. set trainer(=pl.Trainer) & train
-    run_name = "_".join([config.data.preproc_list[0], config.data.dataset_name[0]])
+    run_name = f"{config.data.preproc_list[0]}_{config.data.dataset_name[0]}_bz={config.data.batch_size}_lr={config.optimizer.lr}"
 
     checkpoint_callback = ModelCheckpoint(
         dirpath="checkpoints",
@@ -57,6 +57,7 @@ def main(config):
         callbacks=[checkpoint_callback],
         log_every_n_steps=1,
         logger=logger,
+        precision="16-mixed",
     )
     trainer.fit(model=model_module, datamodule=data_module)
 

@@ -389,9 +389,7 @@ class MrcLightningModule(pl.LightningModule):
                 os.path.dirname(os.path.abspath(__file__))
             )
 
-            run_name = "_".join(
-                [self.config.data.preproc_list[0], self.config.data.dataset_name[0]]
-            )
+            run_name = f"{self.config.data.preproc_list[0]}_{self.config.data.dataset_name[0]}_bz={self.config.data.batch_size}_lr={self.config.optimizer.lr}"
 
             prediction_file = os.path.join(
                 parent_directory,
