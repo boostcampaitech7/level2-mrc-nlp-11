@@ -21,21 +21,30 @@ import module.metric as module_metric
 class MorphsBm25Retrieval:
     def __init__(self, config):
         self.config = config
+        assert self.config.analyzer_name == "Kkma"
         self.analyzer = getattr(morphs_analyzer, self.config.analyzer_name)()
         self.tag_set = self.get_tag_set()
         self.bm25 = None
-        self.context = self.prepare_contexts()
+        self.contexts, self.tokenized_contexts, self.contexts_key_idx_pair = (
+            self.prepare_contexts()
+        )
 
-    def prepare_contexts(self, is_morphs_context=False):
+    def prepare_contexts(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         context_data_path = f"{parent_directory}/{self.config.data_path}"
 
         with open(context_data_path, "r", encoding="utf-8") as file:
             data = json.load(file)
 
-        if is_morphs_context:
-            return list(dict.fromkeys([v["pos_text"] for v in data.values()]))
-        return list(dict.fromkeys([v["text"] for v in data.values()]))
+        text_key_pair = {
+            v["text"]: (k, v[self.config.tokenized_column]) for k, v in data.items()
+        }
+        contexts, tokenized_contexts, contexts_key_idx_pair = [], [], {}
+        for idx, (text, (k, tokenized_text)) in enumerate(text_key_pair.items()):
+            contexts.append(text)
+            tokenized_contexts.append(tokenized_text)
+            contexts_key_idx_pair[k] = idx
+        return contexts, tokenized_contexts, contexts_key_idx_pair
 
     def tokenize(self, context):
         self.analyzer.pos(context)
@@ -83,22 +92,28 @@ class MorphsBm25Retrieval:
         return None
 
     def fit(self):
-        morphs_contexts = self.prepare_contexts(is_morphs_context=True)
-        self.bm25 = getattr(rank_bm25, self.config.model)(morphs_contexts)
+        self.bm25 = getattr(rank_bm25, self.config.model)(self.tokenized_contexts)
+        del self.tokenized_contexts
 
     def save(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        bm25_save_dir = f"{parent_directory}/bm25/"
+        bm25_save_dir = f"{parent_directory}/retrieval_checkpoint/"
         bm25_model_path = (
             bm25_save_dir
-            + f"{self.config.model}_{self.config.analyzer_name}".replace("/", "-")
+            + f"bm25-morphs_model={self.config.model}_tokenizer={self.config.analyzer_name}".replace(
+                "/", "-"
+            )
         )
         if not os.path.isdir(bm25_save_dir):
             os.makedirs(bm25_save_dir)
         with open(bm25_model_path, "wb") as file:
+            self.analyzer = None
             pickle.dump(self, file)
 
     def search(self, query_list, k=1, return_query_score=False):
+        if not self.analyzer:
+            self.analyzer = getattr(morphs_analyzer, self.config.analyzer_name)()
+
         if isinstance(query_list, str):
             query_list = [query_list]
 
@@ -109,7 +124,7 @@ class MorphsBm25Retrieval:
         docs_score, docs_idx, docs, query_score_list = [], [], [], []
         for tokenized_query in tokenized_query_list:
             doc_score, query_score = self.bm25.get_scores(tokenized_query)
-            sorted_idx = np.argsort(docs_score)[::-1]
+            sorted_idx = np.argsort(doc_score)[::-1]
 
             docs_idx.append(sorted_idx[:k])
             docs_score.append(doc_score[sorted_idx][:k])
@@ -129,7 +144,7 @@ class SubwordBm25Retrieval:
         self.config = config
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.tokenizer_name)
         self.bm25 = None
-        self.contexts = self.prepare_contexts()
+        self.contexts, self.contexts_key_idx_pair = self.prepare_contexts()
 
     def prepare_contexts(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -137,7 +152,13 @@ class SubwordBm25Retrieval:
 
         with open(context_data_path, "r", encoding="utf-8") as file:
             data = json.load(file)
-        return list(dict.fromkeys([v["text"] for v in data.values()]))
+
+        text_key_pair = {v["text"]: k for k, v in data.items()}
+        contexts, contexts_key_idx_pair = [], {}
+        for idx, (text, k) in enumerate(text_key_pair.items()):
+            contexts.append(text)
+            contexts_key_idx_pair[k] = idx
+        return contexts, contexts_key_idx_pair
 
     def fit(self):
         tokenized_contexts = []
@@ -147,10 +168,12 @@ class SubwordBm25Retrieval:
 
     def save(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        bm25_save_dir = f"{parent_directory}/bm25/"
+        bm25_save_dir = f"{parent_directory}/retrieval_checkpoint/"
         bm25_model_path = (
             bm25_save_dir
-            + f"{self.config.model}_{self.config.tokenizer_name}".replace("/", "-")
+            + f"bm25-subword_model={self.config.model}_tokenizer={self.config.tokenizer_name}".replace(
+                "/", "-"
+            )
         )
         if not os.path.isdir(bm25_save_dir):
             os.makedirs(bm25_save_dir)
@@ -186,7 +209,7 @@ class TfIdfRetrieval:
 
     def __init__(self, config):
         self.config = config
-        self.contexts = self.prepare_contexts()
+        self.contexts, self.contexts_key_idx_pair = self.prepare_contexts()
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.tokenizer_name)
         self.vectorizer = TfidfVectorizer(
             tokenizer=self.tokenizer.tokenize,
@@ -201,17 +224,23 @@ class TfIdfRetrieval:
 
         with open(context_data_path, "r", encoding="utf-8") as file:
             data = json.load(file)
-        return np.array(list(dict.fromkeys([v["text"] for v in data.values()])))
+
+        text_key_pair = {v["text"]: k for k, v in data.items()}
+        contexts, contexts_key_idx_pair = [], {}
+        for idx, (text, k) in enumerate(text_key_pair.items()):
+            contexts.append(text)
+            contexts_key_idx_pair[k] = idx
+        return np.array(contexts), contexts_key_idx_pair
 
     def fit(self):
         self.sparse_embedding_matrix = self.vectorizer.fit_transform(self.contexts)
 
     def save(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        tfidf_save_dir = f"{parent_directory}/tfidf/"
+        tfidf_save_dir = f"{parent_directory}/retrieval_checkpoint/"
         tfidf_model_path = (
             tfidf_save_dir
-            + f"tokenizer={self.config.tokenizer_name}_ngram={self.config.ngram}".replace(
+            + f"tf-idf_tokenizer={self.config.tokenizer_name}_ngram={self.config.ngram}".replace(
                 "/", "-"
             )
         )

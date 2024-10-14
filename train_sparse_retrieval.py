@@ -15,7 +15,7 @@ def main(config):
     retrieval.save()
 
     mode = "validation"
-    top_k = 10
+    top_k = 1
 
     # 2. evaluate model
     # 2.1. load eval examples
@@ -35,6 +35,7 @@ def main(config):
             "\\n", ""
         ) in [d.replace(" ", "").replace("\n", "").replace("\\n", "") for d in doc]:
             cnt += 1
+        print(cnt)
     print(f"mode: {mode}, total: {len(examples)}, correct: {cnt}")
 
 
