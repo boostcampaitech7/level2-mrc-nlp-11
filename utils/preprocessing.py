@@ -19,15 +19,14 @@ def test(example):
 
 
 def title_context_merge(example):
-    # 제목을 강조하기 위해 특정 토큰을 추가합니다.
-    title = f"<TITLE> {example['title']} <TITLE_END> "
+    title = example['title']
 
     # 각 답변의 시작 위치를 수정
     for idx in range(len(example["answers"]["answer_start"])):
         example["answers"]["answer_start"][idx] = example["answers"]["answer_start"][
             idx
-        ] + len(title)
+        ] + len(title) + 1
     
-    # 제목과 문맥을 결합
-    example["context"] = f"{title}{example['context']}"
+    # 제목과 문맥을 공백으로 결합
+    example["context"] = f"{title} {example['context']}"
     return example
