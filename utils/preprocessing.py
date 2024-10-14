@@ -17,6 +17,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import joblib
 import threading
 import re
+from konlpy.tag import Okt, Kkma
 
 
 # 질문의 카테고리를 분류하는 모델
@@ -83,14 +84,15 @@ def categorize_question(example):
     category = model_predictor.predict(example["question"])
     example["question"] = example["question"] + "<" + category + ">"
     return example
+  
 
-
+# 전처리 기본 함수
 def original(example):
     return example
 
 
+# title, context 병합 함수
 def title_context_merge(example):
-    # 제목을 강조하기 위해 특정 토큰을 추가합니다.
     title = f"<TITLE> {example['title']} <TITLE_END> "
     for idx in range(len(example["answers"]["answer_start"])):
         example["answers"]["answer_start"][idx] = example["answers"]["answer_start"][
@@ -100,6 +102,46 @@ def title_context_merge(example):
     return example
 
 
+# question 조사 제거 함수
+def remove_josa(example):
+    okt = Okt()
+    tokens = okt.pos(example['question'])
+    filtered_tokens = [word for word, pos in tokens if pos != 'Josa']
+    example['question'] = example['question'] + " [SEP] " + ' '.join(filtered_tokens)
+    print(example['question'])
+    return example
+
+  
+# question 명사 추출 및 병합 함수 
+def nouns(example):
+    kkma = Kkma()
+    tokens = kkma.pos(example['question'])
+
+    filtered_tokens = [word for word, pos in tokens if pos in ['NNG', 'NNP', 'NNB', 'NP', 'NR']]
+
+    # 복합 명사 처리
+    merged_tokens = []
+    temp = ""
+    for word in filtered_tokens:
+        if temp:  # 이전에 처리된 명사가 있으면 결합 시도
+            # 예시: '행' + '정부' => '행정부'
+            merged_word = temp + word
+            if merged_word in example['question']:  # 결합된 단어가 원본 텍스트에 있으면 결합
+                temp = merged_word  # 결합한 단어를 temp에 저장
+            else:  # 결합 실패하면 temp에 현재 단어 저장
+                merged_tokens.append(temp)
+                temp = word
+        else:
+            temp = word
+
+    if temp:  # 마지막 남은 단어 처리
+        merged_tokens.append(temp)
+
+    example['question'] = example['question'] + " [SEP] " + ', '.join(merged_tokens)
+
+    return example
+
+  
 # 마크다운 패턴 제거 함수
 def remove_markdown(example):
     # 원본 문맥과 answer_start 저장
