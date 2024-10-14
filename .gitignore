@@ -7,7 +7,6 @@ wandb/
 tfidf/
 tfidf.py
 checkpoints/
-.cz.yaml
 bm25/
 wiki_kkma.json
 sr_inference.py
