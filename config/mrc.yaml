@@ -1,4 +1,3 @@
-run_name: 7_category
 data:
   data_module: MrcDataModule
   dataset_name: [default] #default, klue_mrc, squad_kor_v1
@@ -10,6 +9,7 @@ data:
   n_best_size: 5
   preproc_list: [original]
   add_special_token: []
+  remove_columns: [token_type_ids]
 
 model:
   plm_name: klue/roberta-large
