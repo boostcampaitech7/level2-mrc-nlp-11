@@ -21,12 +21,12 @@ def load_data(_config):
         dataset: 질문-문서(-정답) 페어 데이터셋입니다.
     """
 
-    data_path = (
-        os.path.dirname(os.path.abspath(__file__)) + f"/data/train_dataset/train"
-    )  # 베이스라인 데이터의 train_dataset/train
     # data_path = (
-    #     os.path.dirname(os.path.abspath(__file__)) + f"/data/train_dataset/validation"
-    # )  # 베이스라인 데이터의 train_dataset/validation
+    #     os.path.dirname(os.path.abspath(__file__)) + f"/data/train_dataset/train"
+    # )  # 베이스라인 데이터의 train_dataset/train
+    data_path = (
+        os.path.dirname(os.path.abspath(__file__)) + f"/data/train_dataset/validation"
+    )  # 베이스라인 데이터의 train_dataset/validation
 
     # # config에 설정한 데이터셋 불러오기
     # # **미구현**
@@ -73,7 +73,7 @@ def load_tokenized_samples(_config):
     Returns:
         tokenized_samples: 질문-문서 시퀀스의 토크나이징 결과 데이터
     """
-    tokenized_samples_path = f"{_config.train.output_dir}/train_tokenized_samples.json"
+    tokenized_samples_path = f"{_config.train.output_dir}/eval_tokenized_samples.json"
     # tokenized_samples_path = os.path.dirname(os.path.abspath(__file__)) + "/outputs/tokenized_samples.json"
 
     if os.path.exists(tokenized_samples_path):
@@ -200,7 +200,9 @@ def main(config):
     predictions = load_predictions(config)
     tokenized_samples = load_tokenized_samples(config)
 
-    tab1, tab2, tab3 = st.tabs(["하나씩 보기", "묶음으로 보기", "위키 문서 살펴보기"])
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["하나씩 보기", "묶음으로 보기", "위키 문서 살펴보기", "Retrieval 결과 보기"]
+    )
     # ================
     # 하나씩 보기 탭
     # ================

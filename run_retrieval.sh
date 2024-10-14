@@ -1,7 +1,7 @@
 #!/bin/bash
 
-HUGGINGFACE_TOKEN=""
-PROJECT_NAME="test"
+HUGGINGFACE_TOKEN="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"
+PROJECT_NAME="wiki_normalize"
 SWEEP_CONFIG="./config/retrieval_sweep.yaml"
 COUNT=2
 

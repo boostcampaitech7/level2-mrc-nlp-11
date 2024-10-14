@@ -26,6 +26,6 @@ train:
 
 wandb:
   enable: true
-  project: sangyeop
+  project: normalize_wiki
 
 device: cuda
