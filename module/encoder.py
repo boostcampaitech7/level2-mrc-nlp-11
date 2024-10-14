@@ -1,4 +1,4 @@
-from transformers import AutoTokenizer, BertPreTrainedModel, BertModel
+from transformers import BertPreTrainedModel, BertModel
 
 
 class BertEncoder(BertPreTrainedModel):
