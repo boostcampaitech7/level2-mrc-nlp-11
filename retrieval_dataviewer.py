@@ -1,9 +1,11 @@
 import streamlit as st
 import hydra
 import pandas as pd
-
 from utils.analysis_sparse import SparseRetrievalAnalysis
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 st.set_page_config(layout="wide", page_title="SEVEN ELEVEN MRC Data Viewer V1.0.0")
 
 
@@ -118,7 +120,7 @@ def main(config):
 
     with tab1:
         anaylzer.load_result(
-            "/data/ephemeral/home/gj/level2-mrc-nlp-11/data/TfIdfRetrieval-result.json"
+            os.getenv("DIR_PATH") + "/level2-mrc-nlp-11/data/TfIdfRetrieval-result.json"
         )
         setting_section, result_section = st.columns([1, 2])
         with setting_section:
@@ -174,7 +176,8 @@ def main(config):
 
     with tab2:
         anaylzer.load_result(
-            "/data/ephemeral/home/gj/level2-mrc-nlp-11/data/TfIdfRetrieval-SubwordBm25Retrieval-compare-result.json"
+            os.getenv("DIR_PATH")
+            + "/level2-mrc-nlp-11/data/TfIdfRetrieval-SubwordBm25Retrieval-compare-result.json"
         )
         setting_section, result_section = st.columns([1, 2])
         with setting_section:

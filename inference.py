@@ -1,8 +1,14 @@
+import glob
 import pytorch_lightning as pl
 from module.data import *
 from module.mrc import *
 from module.retrieval import *
 from datasets import load_from_disk
+import os
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 
 def main(retrieval_checkpooint, mrc_checkpoint):
@@ -87,17 +93,21 @@ def main(retrieval_checkpooint, mrc_checkpoint):
 
 if __name__ == "__main__":
     retrieval_checkpoint = (
-        "/data/ephemeral/home/gj/level2-mrc-nlp-11/bm25/BM25Okapi_klue-bert-base"
+        os.getenv("DIR_PATH") + "/level2-mrc-nlp-11/bm25/BM25Okapi_klue-bert-base"
     )
     # 1. 체크포인트 디렉토리 경로 예시
-    checkpoints_dir = "/data/ephemeral/home/level2-mrc-nlp-11/checkpoints" # 내 체크포인트 폴더의 경로로 변경하기
+    checkpoints_dir = (
+        os.getenv("DIR_PATH") + "/level2-mrc-nlp-11/checkpoints"
+    )  # 내 체크포인트 폴더의 경로로 변경하기
     # 2. 최신 체크포인트 파일을 찾음
-    checkpoint_files = glob.glob(os.path.join(checkpoints_dir, "*.ckpt"))  # 모든 .ckpt 파일 찾기
+    checkpoint_files = glob.glob(
+        os.path.join(checkpoints_dir, "*.ckpt")
+    )  # 모든 .ckpt 파일 찾기
     if checkpoint_files:
         # 가장 최근 체크포인트 파일
         mrc_checkpoint = max(checkpoint_files, key=os.path.getctime)
         print(f"Using mrc model checkpoint: {mrc_checkpoint}")
-    else: # 3.체크 포인트가 존재하지 않으면 에러가 발생됨
+    else:  # 3.체크 포인트가 존재하지 않으면 에러가 발생됨
         raise FileNotFoundError("No checkpoint files found in the specified directory.")
 
     main(retrieval_checkpoint, mrc_checkpoint)

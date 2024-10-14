@@ -5,7 +5,10 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from datasets import set_caching_enabled
 import hydra
+from dotenv import load_dotenv
 
+# .env 파일 로드
+load_dotenv()
 # fix random seeds for reproducibility
 """
 SEED = 123
@@ -19,7 +22,6 @@ set_caching_enabled(False)
 
 @hydra.main(config_path="./config", config_name="mrc", version_base=None)
 def main(config):
-
     # 0. logger
     logger = WandbLogger(project=config.wandb.project) if config.wandb.enable else None
 
