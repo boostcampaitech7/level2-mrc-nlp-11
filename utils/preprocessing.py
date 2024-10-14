@@ -12,6 +12,7 @@ STANDARD DATA FORMAT
 }
 """
 
+from konlpy.tag import Okt, Kkma
 
 def test(example):
     example["context"] = example["context"].replace("\n", " ")
@@ -28,8 +29,6 @@ def title_context_merge(example):
     example["context"] = f"{title}{example['context']}"
     return example
 
-
-from konlpy.tag import Okt, Kkma
 
 # 조사를 제거하는 함수
 def remove_josa(example):
