@@ -30,26 +30,9 @@ def title_context_merge(example):
 
 
 from konlpy.tag import Okt, Kkma
-"""
-STANDARD DATA FORMAT
-{
-    'id': Value(dtype='string', id=None),
-    'title': Value(dtype='string', id=None),
-    'context': Value(dtype='string', id=None),
-    'question': Value(dtype='string', id=None),
-    'answers': Sequence(feature={
-        'text': Value(dtype='string', id=None),
-        'answer_start': Value(dtype='int32', id=None)
-    }, length=-1, id=None)
-}
-"""
-
-
-def test(example):
-    return example
 
 # 조사를 제거하는 함수
-def remove_josa_1(example):
+def remove_josa(example):
     okt = Okt()
     tokens = okt.pos(example['question'])
     filtered_tokens = [word for word, pos in tokens if pos != 'Josa']
@@ -57,7 +40,7 @@ def remove_josa_1(example):
     print(example['question'])
     return example
 
-def nouns_1(example):
+def nouns(example):
     kkma = Kkma()
     tokens = kkma.pos(example['question'])
 
