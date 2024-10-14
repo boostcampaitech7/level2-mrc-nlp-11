@@ -16,8 +16,7 @@ import re
 from transformers import BertTokenizerFast
 
 
-def test(example):
-    # example["context"] = example["context"].replace("\n", " ")
+def original(example):
     return example
 
 
