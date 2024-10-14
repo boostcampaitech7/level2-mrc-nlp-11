@@ -8,7 +8,7 @@ data:
   batch_size: 16
   n_best_size: 5
   preproc_list: [replace_markdown_with_doc]
-  add_special_token: [<DOC>, <TEST>, <TITLE>, <TITLE_END>, <HEADER>, <LIST>, <BOLD>, <ITALIC>]
+  add_special_token: [<DOC>, <TEST>, <TITLE>, <TITLE_END>, <HEADER>, <LIST>]
 
 model:
   plm_name: klue/bert-base
@@ -17,14 +17,14 @@ metric: [squad, bleu] #squad, bleu
 
 optimizer:
   name: AdamW
-  lr: 0.000015
+  lr: 1.6764783497920226e-05
 
 train:
   output_dir: "outputs"
-  num_train_epochs: 2
+  num_train_epochs: 10
 
 wandb:
   enable: true
-  project: Mrc baseline
+  project: minseon
 
 device: cuda
