@@ -11,7 +11,7 @@ data:
   add_special_token: [<DOC>, <TEST>, <TITLE>, <TITLE_END>, <HEADER>, <LIST>]
 
 model:
-  plm_name: klue/bert-base
+  plm_name: uomnf97/klue-roberta-finetuned-korquad-v2 #klue/bert-base
 
 metric: [squad, bleu] #squad, bleu
 
