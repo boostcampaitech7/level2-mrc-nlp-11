@@ -11,12 +11,14 @@ STANDARD DATA FORMAT
     }, length=-1, id=None)
 }
 """
+
 from functools import wraps
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from sklearn.preprocessing import LabelEncoder
 import joblib
 import threading
+
 
 class ModelPredictorSingleton:
     _instance = None
@@ -36,7 +38,9 @@ class ModelPredictorSingleton:
         self.model_path = model_path
         self.tokenizer_path = tokenizer_path
         self.label_encoder_path = label_encoder_path
-        self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = device or torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
         self.model = None
         self.tokenizer = None
         self.label_encoder = None
@@ -44,7 +48,9 @@ class ModelPredictorSingleton:
 
     def load_resources(self):
         if self.model is None:
-            self.model = AutoModelForSequenceClassification.from_pretrained(self.model_path)
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                self.model_path
+            )
             self.model.to(self.device)
             self.model.eval()
         if self.tokenizer is None:
@@ -55,7 +61,9 @@ class ModelPredictorSingleton:
     def predict(self, text):
         self.load_resources()
         # 예측 로직은 이전과 동일합니다.
-        inputs = self.tokenizer(text, return_tensors='pt', padding=True, truncation=True).to(self.device)
+        inputs = self.tokenizer(
+            text, return_tensors="pt", padding=True, truncation=True
+        ).to(self.device)
         with torch.no_grad():
             outputs = self.model(**inputs)
             probs = torch.nn.functional.softmax(outputs.logits, dim=1)
@@ -63,19 +71,25 @@ class ModelPredictorSingleton:
             category = self.label_encoder.inverse_transform([predicted_class])[0]
         return category
 
+
 def categorize_question(example):
     # Singleton 인스턴스 생성 (필요할 때 한 번만 생성)
     model_predictor = ModelPredictorSingleton(
-        model_path='/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/question_classification/bert-base-multilingual-cased',
-        tokenizer_path='/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/question_classification/bert-base-multilingual-cased',
-        label_encoder_path='/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/question_classification/bert-base-multilingual-cased/label_encoder.joblib'
+        model_path="/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/question_classification/7_category_bert-base-multilingual-cased",
+        tokenizer_path="/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/question_classification/7_category_bert-base-multilingual-cased",
+        label_encoder_path="/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/question_classification/7_category_bert-base-multilingual-cased/label_encoder.joblib",
     )
-    category = model_predictor.predict(example['question'])
-    example['question'] = example['question'] + '<' + category + '>'
+    category = model_predictor.predict(example["question"])
+    example["question"] = example["question"] + "<" + category + ">"
     return example
+
 
 def test(example):
     example["context"] = example["context"].replace("\n", " ")
+    return example
+
+
+def original(example):
     return example
 
 

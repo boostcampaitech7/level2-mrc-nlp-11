@@ -10,9 +10,9 @@ import hydra
 def main(config):
 
     mode = "validation"
-    top_k = 10
+    top_k = 5
     only_mrc = True
-    model_checkpoint = "/data/ephemeral/home/sangyeop/exercise/level2-mrc-nlp-11/checkpoints/baseline_epoch=07_exact_match=59.58.ckpt"
+    model_checkpoint = "/data/ephemeral/home/sangyeop/exercise/level2-mrc-nlp-11/checkpoints/7_categorycategorize_question_epoch=06_exact_match=58.33.ckpt"
 
     if mode == "validation":
         # 1. load eval examples
@@ -44,7 +44,7 @@ def main(config):
         # 5.1. put eval examples and eval dataset to inference
         mrc.eval_examples = preproc_eval_examples
         mrc.eval_dataset = data_module.eval_dataset
-
+        print(mrc.eval_examples[0])
         # 6. inference eval dataset
         trainer = pl.Trainer()
         trainer.validate(model=mrc, dataloaders=val_dataloader)

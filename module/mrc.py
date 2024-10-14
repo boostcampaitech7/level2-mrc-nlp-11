@@ -388,25 +388,36 @@ class MrcLightningModule(pl.LightningModule):
             parent_directory = os.path.dirname(
                 os.path.dirname(os.path.abspath(__file__))
             )
+            run_name = "_".join(
+                [self.config.run_name, self.config.data.preproc_list[0]]
+            )
             prediction_file = os.path.join(
                 parent_directory,
                 output_dir,
-                "predictions.json" if prefix is None else f"{prefix}_predictions.json",
+                (
+                    f"{run_name}_predictions.json"
+                    if prefix is None
+                    else f"{run_name}_{prefix}_predictions.json"
+                ),
             )
             nbest_file = os.path.join(
                 parent_directory,
                 output_dir,
                 (
-                    "nbest_predictions.json"
+                    f"{run_name}_nbest_predictions.json"
                     if prefix is None
-                    else f"{prefix}_nbest_predictions.json"
+                    else f"{run_name}_{prefix}_nbest_predictions.json"
                 ),
             )
             if version_2_with_negative:
                 null_odds_file = os.path.join(
                     parent_directory,
                     output_dir,
-                    "null_odds.json" if prefix is None else f"{prefix}_null_odds.json",
+                    (
+                        f"{run_name}_null_odds.json"
+                        if prefix is None
+                        else f"{run_name}_{prefix}_null_odds.json"
+                    ),
                 )
 
             logger.info(f"Saving predictions to {prediction_file}.")

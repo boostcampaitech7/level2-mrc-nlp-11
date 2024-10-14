@@ -1,3 +1,4 @@
+run_name: 7_category
 data:
   data_module: MrcDataModule
   dataset_name: [default] #default, klue_mrc, squad_kor_v1
@@ -7,11 +8,11 @@ data:
   doc_stride: 128
   batch_size: 16
   n_best_size: 5
-  preproc_list: [categorize_question]
-  add_special_token: [<OBJECT>, <HUMAN> , <LOCATION>, <TIME>, <ORGANIZATION>, <METHOD>, <EVENT>, <NUMERIC>, <RELATION>, <ETC>]
+  preproc_list: [original]
+  add_special_token: []
 
 model:
-  plm_name: klue/bert-base
+  plm_name: klue/roberta-large
 
 metric: [squad, bleu] #squad, bleu
 
@@ -21,7 +22,7 @@ optimizer:
 
 train:
   output_dir: "outputs"
-  num_train_epochs: 10
+  num_train_epochs: 13
 
 wandb:
   enable: true
