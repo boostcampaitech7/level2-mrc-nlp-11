@@ -115,7 +115,7 @@ class CombineBm25Retrieval:
 
     def save(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        bm25_save_dir = f"{parent_directory}/retrieval_checkpoint/"
+        bm25_save_dir = f"{parent_directory}/retrieval_checkpoints/"
         bm25_model_path = (
             bm25_save_dir
             + f"combine-bm25_model={self.config.morphs.model}_analyzer={self.config.morphs.analyzer_name}_tokenizer={self.config.subword.tokenizer_name}".replace(
@@ -248,7 +248,7 @@ class MorphsBm25Retrieval:
 
     def save(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        bm25_save_dir = f"{parent_directory}/retrieval_checkpoint/"
+        bm25_save_dir = f"{parent_directory}/retrieval_checkpoints/"
         bm25_model_path = (
             bm25_save_dir
             + f"bm25-morphs_model={self.config.model}_tokenizer={self.config.analyzer_name}".replace(
@@ -321,7 +321,7 @@ class SubwordBm25Retrieval:
 
     def save(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        bm25_save_dir = f"{parent_directory}/retrieval_checkpoint/"
+        bm25_save_dir = f"{parent_directory}/retrieval_checkpoints/"
         bm25_model_path = (
             bm25_save_dir
             + f"bm25-subword_model={self.config.model}_tokenizer={self.config.tokenizer_name}".replace(
@@ -392,7 +392,7 @@ class TfIdfRetrieval:
 
     def save(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        tfidf_save_dir = f"{parent_directory}/retrieval_checkpoint/"
+        tfidf_save_dir = f"{parent_directory}/retrieval_checkpoints/"
         tfidf_model_path = (
             tfidf_save_dir
             + f"tf-idf_tokenizer={self.config.tokenizer_name}_ngram={self.config.ngram}".replace(
