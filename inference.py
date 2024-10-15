@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def main(retrieval_checkpooint, mrc_checkpoint):
+def main(retrieval_checkpoint, mrc_checkpoint):
 
     mode = "validation"
     top_k = 10
@@ -22,7 +22,7 @@ def main(retrieval_checkpooint, mrc_checkpoint):
     mrc = MrcLightningModule.load_from_checkpoint(mrc_checkpoint)
     # 0.2. load retrieval model
     if not only_mrc:
-        with open(retrieval_checkpooint, "rb") as file:
+        with open(retrieval_checkpoint, "rb") as file:
             retrieval = pickle.load(file)
     # 0.3. set config
     config = mrc.config

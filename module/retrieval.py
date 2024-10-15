@@ -294,13 +294,28 @@ class DenseRetrieval(pl.LightningModule):
 
         p_inputs = {
             "input_ids": batch[0]
-            .view(self.config.data.batch_size * (self.config.data.num_neg + 1), -1)
+            .view(
+                self.config.data.batch_size
+                * (self.config.data.num_neg + 1)
+                * self.config.data.overflow_limit,
+                -1,
+            )
             .to(self.config.device),
             "attention_mask": batch[1]
-            .view(self.config.data.batch_size * (self.config.data.num_neg + 1), -1)
+            .view(
+                self.config.data.batch_size
+                * (self.config.data.num_neg + 1)
+                * self.config.data.overflow_limit,
+                -1,
+            )
             .to(self.config.device),
             "token_type_ids": batch[2]
-            .view(self.config.data.batch_size * (self.config.data.num_neg + 1), -1)
+            .view(
+                self.config.data.batch_size
+                * (self.config.data.num_neg + 1)
+                * self.config.data.overflow_limit,
+                -1,
+            )
             .to(self.config.device),
         }
 
@@ -314,11 +329,19 @@ class DenseRetrieval(pl.LightningModule):
         q_outputs = self.q_encoder(**q_inputs)
 
         p_outputs = p_outputs.view(
-            self.config.data.batch_size, self.config.data.num_neg + 1, -1
+            self.config.data.batch_size,
+            self.config.data.num_neg + 1,
+            self.config.data.overflow_limit,
+            -1,
         )
+        mean_p_outputs = torch.sum(p_outputs, dim=-2)
         q_outputs = q_outputs.view(self.config.data.batch_size, 1, -1)
+        print(mean_p_outputs.size())
+        print(q_outputs.size())
 
-        similarity_scores = torch.bmm(q_outputs, p_outputs.transpose(-2, -1)).squeeze()
+        similarity_scores = torch.bmm(
+            q_outputs, mean_p_outputs.transpose(-2, -1)
+        ).squeeze()
         similarity_scores = F.log_softmax(similarity_scores, dim=-1)
 
         loss = self.criterion(similarity_scores, targets)
@@ -330,13 +353,28 @@ class DenseRetrieval(pl.LightningModule):
 
         p_inputs = {
             "input_ids": batch[0]
-            .view(self.config.data.batch_size * (self.config.data.num_neg + 1), -1)
+            .view(
+                self.config.data.batch_size
+                * (self.config.data.num_neg + 1)
+                * self.config.data.overflow_limit,
+                -1,
+            )
             .to(self.config.device),
             "attention_mask": batch[1]
-            .view(self.config.data.batch_size * (self.config.data.num_neg + 1), -1)
+            .view(
+                self.config.data.batch_size
+                * (self.config.data.num_neg + 1)
+                * self.config.data.overflow_limit,
+                -1,
+            )
             .to(self.config.device),
             "token_type_ids": batch[2]
-            .view(self.config.data.batch_size * (self.config.data.num_neg + 1), -1)
+            .view(
+                self.config.data.batch_size
+                * (self.config.data.num_neg + 1)
+                * self.config.data.overflow_limit,
+                -1,
+            )
             .to(self.config.device),
         }
 
@@ -350,11 +388,17 @@ class DenseRetrieval(pl.LightningModule):
         q_outputs = self.q_encoder(**q_inputs)
 
         p_outputs = p_outputs.view(
-            self.config.data.batch_size, self.config.data.num_neg + 1, -1
+            self.config.data.batch_size,
+            self.config.data.num_neg + 1,
+            self.config.data.overflow_limit,
+            -1,
         )
+        mean_p_outputs = torch.sum(p_outputs, dim=-2)
         q_outputs = q_outputs.view(self.config.data.batch_size, 1, -1)
 
-        similarity_scores = torch.bmm(q_outputs, p_outputs.transpose(-2, -1)).squeeze()
+        similarity_scores = torch.bmm(
+            q_outputs, mean_p_outputs.transpose(-2, -1)
+        ).squeeze()
         similarity_scores = F.log_softmax(similarity_scores, dim=-1)
 
         self.validation_step_outputs["sim_score"].extend(similarity_scores.cpu())
