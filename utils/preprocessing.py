@@ -12,13 +12,16 @@ STANDARD DATA FORMAT
 }
 """
 
-
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import joblib
 import threading
 import re
 from konlpy.tag import Okt, Kkma
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 # 질문의 카테고리를 분류하는 모델
@@ -78,14 +81,17 @@ class ModelPredictorSingleton:
 def categorize_question(example):
     # Singleton 인스턴스 생성 (필요할 때 한 번만 생성)
     model_predictor = ModelPredictorSingleton(
-        model_path="/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/question_classification/7_category_bert-base-multilingual-cased",
-        tokenizer_path="/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/question_classification/7_category_bert-base-multilingual-cased",
-        label_encoder_path="/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/question_classification/7_category_bert-base-multilingual-cased/label_encoder.joblib",
+        model_path=os.getenv("DIR_PATH")
+        + "/level2-mrc-nlp-11/question_classification/7_category_bert-base-multilingual-cased",
+        tokenizer_path=os.getenv("DIR_PATH")
+        + "/level2-mrc-nlp-11/question_classification/7_category_bert-base-multilingual-cased",
+        label_encoder_path=os.getenv("DIR_PATH")
+        + "/level2-mrc-nlp-11/question_classification/7_category_bert-base-multilingual-cased/label_encoder.joblib",
     )
     category = model_predictor.predict(example["question"])
     example["question"] = example["question"] + "<" + category + ">"
     return example
-  
+
 
 # 전처리 기본 함수
 def original(example):
@@ -95,13 +101,13 @@ def original(example):
 # 제목을 강조하기 위해 특정 토큰을 추가합니다.
 def title_context_merge_token(example):
     title = f"<TITLE> {example['title']} <TITLE_END> "
-    
+
     # 각 답변의 시작 위치를 수정
     for idx in range(len(example["answers"]["answer_start"])):
         example["answers"]["answer_start"][idx] = example["answers"]["answer_start"][
             idx
         ] + len(title)
-    
+
     # 제목과 문맥을 결합
     example["context"] = f"{title}{example['context']}"
     return example
@@ -109,14 +115,14 @@ def title_context_merge_token(example):
 
 # 제목을 컨텍스트 앞에 추가하고, 각 답변의 시작 위치를 제목 길이만큼 조정하는 함수.
 def title_context_merge_gap(example):
-    title = example['title']
+    title = example["title"]
 
     # 각 답변의 시작 위치를 수정
     for idx in range(len(example["answers"]["answer_start"])):
-        example["answers"]["answer_start"][idx] = example["answers"]["answer_start"][
-            idx
-        ] + len(title) + 1
-    
+        example["answers"]["answer_start"][idx] = (
+            example["answers"]["answer_start"][idx] + len(title) + 1
+        )
+
     # 제목과 문맥을 공백으로 결합
     example["context"] = f"{title} {example['context']}"
     return example
@@ -125,22 +131,28 @@ def title_context_merge_gap(example):
 # 제목과 질문 간의 Jaccard 유사도를 기반으로 제목을 강조하여 컨텍스트에 포함하는 함수.
 def title_context_merge_jaccard(example):
     # 제목과 문서 전처리
-    title = example['title'].strip()
-    context = example['context'].strip()
-    question = example['question'].strip()
+    title = example["title"].strip()
+    context = example["context"].strip()
+    question = example["question"].strip()
 
     # 제목과 질문의 단어 집합 생성
-    title_words = set(re.findall(r'\w+', title))
-    question_words = set(re.findall(r'\w+', question))
+    title_words = set(re.findall(r"\w+", title))
+    question_words = set(re.findall(r"\w+", question))
 
     # Jaccard 유사도 계산
-    jaccard_similarity = len(title_words.intersection(question_words)) / len(title_words.union(question_words))
+    jaccard_similarity = len(title_words.intersection(question_words)) / len(
+        title_words.union(question_words)
+    )
 
     # 제목이 질문과 관련이 높을 경우 컨텍스트에 제목을 강조
     if jaccard_similarity > 0.7:  # 유사성이 일정 기준 이상일 때
-        example['context'] = f"<TITLE> {title} <TITLE_END> {context}"  # 스페셜 토큰 추가
+        example["context"] = (
+            f"<TITLE> {title} <TITLE_END> {context}"  # 스페셜 토큰 추가
+        )
         for idx in range(len(example["answers"]["answer_start"])):
-            example["answers"]["answer_start"][idx] = example["answers"]["answer_start"][idx] + len(example['title'])
+            example["answers"]["answer_start"][idx] = example["answers"][
+                "answer_start"
+            ][idx] + len(example["title"])
     return example
 
 
@@ -152,23 +164,25 @@ def title_context_merge_behind(example):
     example["context"] = f"{example['context']}{title}"
     return example
 
- 
+
 # question 조사 제거 함수
 def remove_josa(example):
     okt = Okt()
-    tokens = okt.pos(example['question'])
-    filtered_tokens = [word for word, pos in tokens if pos != 'Josa']
-    example['question'] = example['question'] + " [SEP] " + ' '.join(filtered_tokens)
-    print(example['question'])
+    tokens = okt.pos(example["question"])
+    filtered_tokens = [word for word, pos in tokens if pos != "Josa"]
+    example["question"] = example["question"] + " [SEP] " + " ".join(filtered_tokens)
+    print(example["question"])
     return example
 
-  
-# question 명사 추출 및 병합 함수 
+
+# question 명사 추출 및 병합 함수
 def nouns(example):
     kkma = Kkma()
-    tokens = kkma.pos(example['question'])
+    tokens = kkma.pos(example["question"])
 
-    filtered_tokens = [word for word, pos in tokens if pos in ['NNG', 'NNP', 'NNB', 'NP', 'NR']]
+    filtered_tokens = [
+        word for word, pos in tokens if pos in ["NNG", "NNP", "NNB", "NP", "NR"]
+    ]
 
     # 복합 명사 처리
     merged_tokens = []
@@ -177,7 +191,9 @@ def nouns(example):
         if temp:  # 이전에 처리된 명사가 있으면 결합 시도
             # 예시: '행' + '정부' => '행정부'
             merged_word = temp + word
-            if merged_word in example['question']:  # 결합된 단어가 원본 텍스트에 있으면 결합
+            if (
+                merged_word in example["question"]
+            ):  # 결합된 단어가 원본 텍스트에 있으면 결합
                 temp = merged_word  # 결합한 단어를 temp에 저장
             else:  # 결합 실패하면 temp에 현재 단어 저장
                 merged_tokens.append(temp)
@@ -188,11 +204,11 @@ def nouns(example):
     if temp:  # 마지막 남은 단어 처리
         merged_tokens.append(temp)
 
-    example['question'] = example['question'] + " [SEP] " + ', '.join(merged_tokens)
+    example["question"] = example["question"] + " [SEP] " + ", ".join(merged_tokens)
 
     return example
 
-  
+
 # 마크다운 패턴 제거 함수
 def remove_markdown(example):
     # 원본 문맥과 answer_start 저장

@@ -24,7 +24,7 @@ train:
 
 wandb:
   enable: true
-  project: normalize_wiki
+  project: ${oc.env:PROJECT_NAME}
 
 device: cuda
 

@@ -1,11 +1,15 @@
 import pytorch_lightning as pl
+import wandb
 import module.data as module_data
 from module.mrc import *
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from datasets import set_caching_enabled
 import hydra
+from dotenv import load_dotenv
 
+# .env 파일 로드
+load_dotenv()
 # fix random seeds for reproducibility
 """
 SEED = 123
@@ -19,7 +23,6 @@ set_caching_enabled(False)
 
 @hydra.main(config_path="./config", config_name="mrc", version_base=None)
 def main(config):
-
     # 0. logger
     logger = WandbLogger(project=config.wandb.project) if config.wandb.enable else None
 
@@ -38,7 +41,10 @@ def main(config):
     )
 
     # 3. set trainer(=pl.Trainer) & train
-    run_name = "_".join([config.data.preproc_list[0], config.data.dataset_name[0]])
+    if config.wandb.enable and logger is not None:
+        run_name = f"{logger.experiment.name}_{config.data.preproc_list[0]}_{config.data.dataset_name[0]}_bz={config.data.batch_size}_lr={config.optimizer.lr}"
+    else:
+        run_name = f"default_{config.data.preproc_list[0]}_{config.data.dataset_name[0]}_bz={config.data.batch_size}_lr={config.optimizer.lr}"
 
     checkpoint_callback = ModelCheckpoint(
         dirpath="checkpoints",
@@ -55,6 +61,7 @@ def main(config):
         callbacks=[checkpoint_callback],
         log_every_n_steps=1,
         logger=logger,
+        precision="16-mixed",
     )
     trainer.fit(model=model_module, datamodule=data_module)
 

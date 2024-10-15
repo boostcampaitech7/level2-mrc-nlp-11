@@ -1,7 +1,14 @@
 #!/bin/bash
 
-HUGGINGFACE_TOKEN="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"
-PROJECT_NAME="wiki_normalize"
+# 스크립트의 디렉토리를 기준으로 .env 파일 소싱
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "${SCRIPT_DIR}/.env" ]; then
+    source "${SCRIPT_DIR}/.env"
+else
+    echo "❌  .env 파일을 찾을 수 없습니다. 스크립트를 종료합니다."
+    exit 1
+fi
+
 SWEEP_CONFIG="./config/retrieval_sweep.yaml"
 COUNT=2
 
