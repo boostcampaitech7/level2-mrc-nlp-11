@@ -13,3 +13,4 @@ sr_inference.py
 correct_docs_idx.json
 retrieval_checkpoint
 test.py
+.env

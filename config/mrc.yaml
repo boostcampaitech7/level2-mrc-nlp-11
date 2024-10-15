@@ -7,10 +7,9 @@ data:
   doc_stride: 128
   batch_size: 16
   n_best_size: 5
-  preproc_list: [title_context_merge_token]
-  add_special_token: [<TITLE>, <TITLE_END>]
-  remove_columns: [token_type_ids]
-
+  preproc_list: [original] # title_context_merge_token
+  add_special_token: [] # <TITLE>, <TITLE_END>
+  remove_columns: [token_type_ids] #token_type_ids
 model:
   plm_name: klue/roberta-large
 
@@ -25,7 +24,7 @@ train:
   num_train_epochs: 10
 
 wandb:
-  enable: false
-  project: Mrc baseline
+  enable: true
+  project: ${oc.env:PROJECT_NAME}
 
 device: cuda

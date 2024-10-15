@@ -1,8 +1,14 @@
+import glob
 import pytorch_lightning as pl
 from module.data import *
 from module.mrc import *
 from module.retrieval import *
 from datasets import load_from_disk
+import os
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 
 def main(retrieval_checkpooint, mrc_checkpoint):
@@ -60,7 +66,7 @@ def main(retrieval_checkpooint, mrc_checkpoint):
         test_examples = load_from_disk("./data/test_dataset/")["validation"]
 
         # 2. retrieve context
-        docs_score, docs_idx, docs = retrieval.search(
+        docs_score, docs_idx, docs, titles = retrieval.search(
             test_examples["question"], k=top_k
         )
 
@@ -87,10 +93,12 @@ def main(retrieval_checkpooint, mrc_checkpoint):
 
 if __name__ == "__main__":
     retrieval_checkpoint = (
-        "/data/ephemeral/home/gj/level2-mrc-nlp-11/bm25/BM25Okapi_klue-bert-base"
+        os.getenv("DIR_PATH") + "/level2-mrc-nlp-11/bm25/BM25Okapi_klue-bert-base"
     )
     # 1. 체크포인트 디렉토리 경로 예시
-    checkpoints_dir = "/data/ephemeral/home/level2-mrc-nlp-11/checkpoints"  # 내 체크포인트 폴더의 경로로 변경하기
+    checkpoints_dir = (
+        os.getenv("DIR_PATH") + "/level2-mrc-nlp-11/checkpoints"
+    )  # 내 체크포인트 폴더의 경로로 변경하기
     # 2. 최신 체크포인트 파일을 찾음
     checkpoint_files = glob.glob(
         os.path.join(checkpoints_dir, "*.ckpt")

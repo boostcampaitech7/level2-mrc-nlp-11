@@ -13,10 +13,10 @@ import hydra
 def main(config):
 
     # 1. train retrieval by wiki docs
-    # retrieval = TfIdfRetrieval(config.tfidf)  # 1. subword base tf-idf
+    retrieval = TfIdfRetrieval(config.tfidf)  # 1. subword base tf-idf
     # retrieval = SubwordBm25Retrieval(config.bm25.subword) # 2. subword base bm25
     # retrieval = MorphsBm25Retrieval(config.bm25.morphs) # 3. morphs base bm25
-    retrieval = CombineBm25Retrieval(config.bm25)  # 4. subword + morphs base bm25
+    # retrieval = CombineBm25Retrieval(config.bm25)  # 4. subword + morphs base bm25
     retrieval.fit()
     retrieval.save()
 
