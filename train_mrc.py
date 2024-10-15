@@ -1,4 +1,5 @@
 import pytorch_lightning as pl
+import wandb
 import module.data as module_data
 from module.mrc import *
 from pytorch_lightning.loggers import WandbLogger
@@ -40,7 +41,10 @@ def main(config):
     )
 
     # 3. set trainer(=pl.Trainer) & train
-    run_name = f"{config.data.preproc_list[0]}_{config.data.dataset_name[0]}_bz={config.data.batch_size}_lr={config.optimizer.lr}"
+    if config.wandb.enable and logger is not None:
+        run_name = f"{logger.experiment.name}_{config.data.preproc_list[0]}_{config.data.dataset_name[0]}_bz={config.data.batch_size}_lr={config.optimizer.lr}"
+    else:
+        run_name = f"default_{config.data.preproc_list[0]}_{config.data.dataset_name[0]}_bz={config.data.batch_size}_lr={config.optimizer.lr}"
 
     checkpoint_callback = ModelCheckpoint(
         dirpath="checkpoints",

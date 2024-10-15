@@ -10,7 +10,7 @@ else
 fi
 
 SWEEP_CONFIG="./config/mrc_sweep.yaml"
-COUNT=10
+COUNT=4
 
 use_sweep=true
 
