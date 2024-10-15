@@ -1,5 +1,15 @@
 ## Template 사용법
 
+### 0. data_template
+
+3. retrieval 코드 유의 사항
+    - MorphsBm25Retrieval(config.bm25.morphs) 사용하지 말고SubwordBm25Retrieval(config.bm25.subword),
+    TfIdfRetrieval(config.bm25.TfIdf) 사용
+    - return_query_score=True 하면 각 토큰의 Tf-Idf 스코어 확인 가능한 리스트도 반환
+    - roberta 베이스 모델은 mrc.yaml에 remove_columns: [token_type_ids] 필요
+    - retrieval.yaml 파일 bm25의 model 종류 3가지 있는데 BM25Okapi 사용하면 될 듯
+
+![alt text](picture/2CCE2733-653F-4915-B7D3-63344434F2B5.png)
 ### 1. MRC 학습 방법
 - `train_mrc.py`에서 mrc 모델을 학습해보실 수 있습니다.
 - mrc 설정은 `config/retrieval.yaml`을 통해 수정할 수 있습니다.

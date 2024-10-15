@@ -1,4 +1,9 @@
-from module.retrieval import SubwordBm25Retrieval, MorphsBm25Retrieval, TfIdfRetrieval
+from module.retrieval import (
+    SubwordBm25Retrieval,
+    MorphsBm25Retrieval,
+    CombineBm25Retrieval,
+    TfIdfRetrieval,
+)
 from utils.data_template import get_dataset_list
 from datasets import concatenate_datasets
 import hydra
@@ -8,14 +13,15 @@ import hydra
 def main(config):
 
     # 1. train retrieval by wiki docs
-    # retrieval = SubwordBm25Retrieval(config.bm25.subword) # 1. subword base bm25
-    # retrieval = MorphsBm25Retrieval(config.bm25.morphs) # 2. morphs base bm25
-    retrieval = TfIdfRetrieval(config.tfidf)  # 3. subword base tf-idf
+    # retrieval = TfIdfRetrieval(config.tfidf)  # 1. subword base tf-idf
+    # retrieval = SubwordBm25Retrieval(config.bm25.subword) # 2. subword base bm25
+    # retrieval = MorphsBm25Retrieval(config.bm25.morphs) # 3. morphs base bm25
+    retrieval = CombineBm25Retrieval(config.bm25)  # 4. subword + morphs base bm25
     retrieval.fit()
     retrieval.save()
 
     mode = "validation"
-    top_k = 1
+    top_k = 10
 
     # 2. evaluate model
     # 2.1. load eval examples
@@ -26,7 +32,7 @@ def main(config):
         examples = concatenate_datasets([ds["validation"] for ds in dataset_list])
 
     # 2.2. predict docs
-    _, _, docs = retrieval.search(examples["question"], k=top_k)
+    _, _, docs, _ = retrieval.search(examples["question"], k=top_k)
 
     # 2.3. calculate accuracy
     cnt = 0

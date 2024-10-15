@@ -2,9 +2,11 @@ data:
   data_module: RetrievalDataModule
   dataset_name: [default] #default, klue_mrc, squad_kor_v1
   preprocessing_num_workers: 1
-  max_seq_length: 384
+  max_seq_length: 512
+  doc_stride: 64
   batch_size: 4
   num_neg: 2
+  overflow_limit: 3
 
 model:
   plm_name: klue/bert-base
@@ -26,7 +28,7 @@ wandb:
   enable: true
   project: normalize_wiki
 
-device: cuda
+device: mps
 
 
 tfidf:

@@ -28,7 +28,7 @@ def main(retrieval_checkpooint, mrc_checkpoint):
 
         if not only_mrc:
             # 2. retrieve context
-            docs_score, docs_idx, docs = retrieval.search(
+            docs_score, docs_idx, docs, titles = retrieval.search(
                 eval_examples["question"], k=top_k
             )
 
@@ -90,14 +90,16 @@ if __name__ == "__main__":
         "/data/ephemeral/home/gj/level2-mrc-nlp-11/bm25/BM25Okapi_klue-bert-base"
     )
     # 1. 체크포인트 디렉토리 경로 예시
-    checkpoints_dir = "/data/ephemeral/home/level2-mrc-nlp-11/checkpoints" # 내 체크포인트 폴더의 경로로 변경하기
+    checkpoints_dir = "/data/ephemeral/home/level2-mrc-nlp-11/checkpoints"  # 내 체크포인트 폴더의 경로로 변경하기
     # 2. 최신 체크포인트 파일을 찾음
-    checkpoint_files = glob.glob(os.path.join(checkpoints_dir, "*.ckpt"))  # 모든 .ckpt 파일 찾기
+    checkpoint_files = glob.glob(
+        os.path.join(checkpoints_dir, "*.ckpt")
+    )  # 모든 .ckpt 파일 찾기
     if checkpoint_files:
         # 가장 최근 체크포인트 파일
         mrc_checkpoint = max(checkpoint_files, key=os.path.getctime)
         print(f"Using mrc model checkpoint: {mrc_checkpoint}")
-    else: # 3.체크 포인트가 존재하지 않으면 에러가 발생됨
+    else:  # 3.체크 포인트가 존재하지 않으면 에러가 발생됨
         raise FileNotFoundError("No checkpoint files found in the specified directory.")
 
     main(retrieval_checkpoint, mrc_checkpoint)

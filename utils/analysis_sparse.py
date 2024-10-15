@@ -51,6 +51,7 @@ class SparseRetrievalResultProvider:
             _,
             self.retrieval1_docs_idx,
             self.retrieval1_docs,
+            _,
             self.retrieval1_query_score_list,
         ) = self.retrieval_model1.search(
             self.eval_examples["question"], k=1, return_query_score=True
@@ -67,6 +68,7 @@ class SparseRetrievalResultProvider:
             _,
             self.retrieval1_docs_idx,
             self.retrieval1_docs,
+            _,
             self.retrieval1_query_score_list,
         ) = self.retrieval_model1.search(
             self.eval_examples["question"], k=1, return_query_score=True
@@ -75,6 +77,7 @@ class SparseRetrievalResultProvider:
             _,
             self.retrieval2_docs_idx,
             self.retrieval2_docs,
+            _,
             self.retrieval2_query_score_list,
         ) = self.retrieval_model2.search(
             self.eval_examples["question"], k=1, return_query_score=True
