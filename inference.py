@@ -34,9 +34,19 @@ def main(retrieval_checkpooint, mrc_checkpoint):
 
         if not only_mrc:
             # 2. retrieve context
-            docs_score, docs_idx, docs = retrieval.search(
+            docs_score, docs_idx, docs, titles = retrieval.search(
                 eval_examples["question"], k=top_k
             )
+
+            if "title_context_merge_token" in config.data.preproc_list:
+                docs = [
+                    [
+                        f"<TITLE> {titles[i][j]} <TITLE_END> {docs[i][j]}"
+                        for j in range(len(docs[i]))
+                    ]
+                    for i in range(len(docs))
+                ]
+                print(docs[0])
 
             # 3. change original context to retrieved context
             eval_examples = eval_examples.remove_columns(["context"])
@@ -66,7 +76,7 @@ def main(retrieval_checkpooint, mrc_checkpoint):
         test_examples = load_from_disk("./data/test_dataset/")["validation"]
 
         # 2. retrieve context
-        docs_score, docs_idx, docs = retrieval.search(
+        docs_score, docs_idx, docs, titles = retrieval.search(
             test_examples["question"], k=top_k
         )
 
@@ -93,7 +103,8 @@ def main(retrieval_checkpooint, mrc_checkpoint):
 
 if __name__ == "__main__":
     retrieval_checkpoint = (
-        os.getenv("DIR_PATH") + "/level2-mrc-nlp-11/bm25/BM25Okapi_klue-bert-base"
+        os.getenv("DIR_PATH")
+        + "/level2-mrc-nlp-11/retrieval_checkpoints/tf-idf_tokenizer=klue-bert-base_ngram=[1, 1]"
     )
     # 1. 체크포인트 디렉토리 경로 예시
     checkpoints_dir = (

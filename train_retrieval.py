@@ -27,10 +27,12 @@ set_caching_enabled(False)
 def main(config):
 
     # 0. logger
-    logger = WandbLogger(project=config.wandb.project) if config.wandb.enable else None
+    # logger = WandbLogger(project=config.wandb.project) if config.wandb.enable else None
 
+    print("data")
     # 1. set data_module(=pl.LightningDataModule class)
     data_module = getattr(module_data, config.data.data_module)(config)
+    print("data end")
 
     # 2. set model
     # 2.1. set encoder model
@@ -53,13 +55,13 @@ def main(config):
     )
     trainer = pl.Trainer(
         num_sanity_val_steps=0,
-        accelerator="gpu",
+        accelerator="mps",
         devices=1,
         max_epochs=config.train.num_train_epochs,
         log_every_n_steps=1,
         enable_checkpointing=False,
-        logger=logger,
     )
+    print("start fit")
     trainer.fit(model=retrieval, datamodule=data_module)
 
     # 4. test by validation dataset
