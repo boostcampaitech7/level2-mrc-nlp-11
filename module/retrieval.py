@@ -420,7 +420,7 @@ class TfIdfRetrieval:
             docs_score.append(doc_score)
             docs_idx.append(doc_idx)
             docs.append(list(self.contexts[doc_idx]))
-            titles.append([self.titles[idx] for idx in sorted_idx[:k]])
+            titles.append([self.titles[idx] for idx in doc_idx])
 
         if not return_query_score:
             return docs_score, docs_idx, docs, titles
