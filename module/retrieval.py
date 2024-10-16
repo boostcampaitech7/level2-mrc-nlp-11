@@ -521,8 +521,6 @@ class DenseRetrieval(pl.LightningModule):
         )
         mean_p_outputs = torch.sum(p_outputs, dim=-2)
         q_outputs = q_outputs.view(self.config.data.batch_size, 1, -1)
-        print(mean_p_outputs.size())
-        print(q_outputs.size())
 
         similarity_scores = torch.bmm(
             q_outputs, mean_p_outputs.transpose(-2, -1)

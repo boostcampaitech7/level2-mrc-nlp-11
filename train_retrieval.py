@@ -44,20 +44,22 @@ def main(config):
     retrieval = DenseRetrieval(config, q_encoder, p_encoder)
 
     # 3. set trainer(=pl.Trainer) & train
+    run_name = f"{config.data.neg_sampling_method}_bz={config.data.batch_size}_lr={config.optimizer.lr}"
     checkpoint_callback = ModelCheckpoint(
         dirpath="checkpoints",
-        filename="model-{epoch:02d}-{val_loss:.2f}",
+        filename=run_name + "_{epoch:02d}-{accuracy:.2f}",
         save_top_k=1,
         monitor="accuracy",
         mode="max",
     )
     trainer = pl.Trainer(
         num_sanity_val_steps=0,
+        val_check_interval=0.5,
         accelerator="cuda",
         devices=1,
         max_epochs=config.train.num_train_epochs,
         log_every_n_steps=1,
-        enable_checkpointing=False,
+        callbacks=[checkpoint_callback],
         logger=logger,
     )
     trainer.fit(model=retrieval, datamodule=data_module)

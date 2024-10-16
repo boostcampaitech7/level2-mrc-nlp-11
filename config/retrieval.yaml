@@ -4,18 +4,18 @@ data:
   preprocessing_num_workers: 1
   max_seq_length: 512
   doc_stride: 64
-  batch_size: 2
+  batch_size: 3
   num_neg: 3
   overflow_limit: 3
-  neg_sampling_method: random_neg_sampling_v1
+  neg_sampling_method: sparse_neg_sampling_v2
 
 model:
-  plm_name: klue/bert-base
-  encoder: BertEncoder
+  plm_name: snunlp/KR-ELECTRA-discriminator
+  encoder: ElectraEncoder
 
 loss: nll_loss
 
-metric: [accuracy, f1] #accuracy, f1
+metric: [accuracy] #accuracy, f1
 
 optimizer:
   name: AdamW
@@ -23,7 +23,7 @@ optimizer:
 
 train:
   output_dir: "outputs"
-  num_train_epochs: 2
+  num_train_epochs: 10
 
 wandb:
   enable: true

@@ -79,8 +79,8 @@ class MrcDataModule(pl.LightningDataModule):
     def train_dataloader(self):
         return torch.utils.data.DataLoader(
             self.train_dataset.remove_columns(self.config.data.remove_columns),
-            batch_size=self.config.data.batch_size,
             collate_fn=default_data_collator,
+            batch_size=self.config.data.batch_size,
             shuffle=True,
         )
 
@@ -480,15 +480,22 @@ class RetrievalDataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(
-            self.train_dataset, batch_size=self.config.data.batch_size, shuffle=True
+            self.train_dataset,
+            batch_size=self.config.data.batch_size,
+            shuffle=True,
+            drop_last=True,
         )
 
     def val_dataloader(self):
         return torch.utils.data.DataLoader(
-            self.eval_dataset, batch_size=self.config.data.batch_size
+            self.eval_dataset,
+            batch_size=self.config.data.batch_size,
+            drop_last=True,
         )
 
     def test_dataloader(self):
         return torch.utils.data.DataLoader(
-            self.test_dataset, batch_size=self.config.data.batch_size
+            self.test_dataset,
+            batch_size=self.config.data.batch_size,
+            drop_last=True,
         )
