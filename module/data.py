@@ -1,3 +1,4 @@
+import random
 import torch
 import numpy as np
 import pytorch_lightning as pl
@@ -259,81 +260,195 @@ class RetrievalDataModule(pl.LightningDataModule):
                     [ds[split] for ds in dataset_list]
                 )
 
-            train_dataset = datasets["train"].select(range(104))
-            eval_dataset = datasets["validation"].select(range(104))
+            train_dataset = datasets["train"]
+            eval_dataset = datasets["validation"]
 
             self.train_dataset = self.preprocessing(train_dataset)
             self.eval_dataset = self.preprocessing(eval_dataset)
 
         if stage == "test":
-            test_dataset = concatenate_datasets(
-                [ds["test"] for ds in dataset_list]
-            ).select(range(100))
+            test_dataset = concatenate_datasets([ds["test"] for ds in dataset_list])
             self.test_dataset = self.preprocessing(test_dataset)
 
-    def negative_sampling_v1(self, examples):
-        # random negative sampling
-        pass
+    def random_neg_sampling_v1(self, examples):
+        corpus = list(set([example["context"] for example in examples]))
+        p_with_neg = []
 
-    def negative_sampling_v2(self, examples):
-        tokenized_examples = self.tokenizer(
-            examples["context"],
+        for context, answers in zip(examples["context"], examples["answers"]):
+            p_with_neg.append(context)
+            cnt_neg = 0
+            while cnt_neg < self.config.data.num_neg:
+                neg_idx = random.randrange(0, len(corpus))
+                if corpus[neg_idx] != context and not any(
+                    text in corpus[neg_idx] for text in answers["text"]
+                ):
+                    p_with_neg.append(corpus[neg_idx])
+                    cnt_neg += 1
+
+        tokenized_seqs = self.tokenizer(
+            p_with_neg,
+            truncation=True,
+            max_length=self.config.data.max_seq_length,
+            padding="max_length",
+        )
+        return tokenized_seqs
+
+    def random_neg_sampling_v2(self, examples):
+        corpus = list(set([example["context"] for example in examples]))
+        p_with_neg = []
+
+        for context, answers in zip(examples["context"], examples["answers"]):
+            p_with_neg.append(context)
+            cnt_neg = 0
+            while cnt_neg < self.data.num_neg:
+                neg_idx = random.randrange(0, len(corpus))
+                if corpus[neg_idx] != context and not any(
+                    text in corpus[neg_idx] for text in answers["text"]
+                ):
+                    p_with_neg.append(corpus[neg_idx])
+                    cnt_neg += 1
+
+        tokenized_seqs = self.tokenizer(
+            p_with_neg,
             truncation=True,
             max_length=self.config.data.max_seq_length,
             stride=self.config.data.doc_stride,
             return_overflowing_tokens=True,
             padding="max_length",
         )
-        sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
 
-        # 1. input_ids, token_type_ids, attention_mask
-        negative_sampled_examples = {key: [] for key in tokenized_examples.keys()}
         pad_token_id = self.tokenizer.pad_token_id
+        sample_mapping = tokenized_seqs.pop("overflow_to_sample_mapping")
+        overflow_tokenized_seqs = {
+            "input_ids": [],
+            "attention_mask": [],
+            "token_type_ids": [],
+        }
 
         sample_idx, example_idx = -1, 0
         while len(sample_mapping) > example_idx:
             cnt_overflow = 0
             sample_idx += 1
             while (
-                len(sample_mapping) > example_idx
+                cnt_overflow < self.config.data.overflow_limit
+                and len(sample_mapping) > example_idx
                 and sample_idx == sample_mapping[example_idx]
             ):
-                # add until overflow limit
-                for key, value in tokenized_examples.items():
-                    negative_sampled_examples[key].append(value[example_idx])
+                for key, value in tokenized_seqs.items():
+                    if key not in ["input_ids", "attention_mask", "token_type_ids"]:
+                        continue
+                    overflow_tokenized_seqs[key].append(value[example_idx])
                 cnt_overflow += 1
                 example_idx += 1
-                # skip current sample if overflow is limited
-                if cnt_overflow == self.config.data.overflow_limit:
-                    while sample_mapping[example_idx] == sample_idx:
-                        example_idx += 1
-                    break
-            # append input until current sample is limitting
+
             while cnt_overflow < self.config.data.overflow_limit:
-                negative_sampled_examples["input_ids"].append(
+                overflow_tokenized_seqs["input_ids"].append(
                     [pad_token_id] * self.config.data.max_seq_length
                 )
-                negative_sampled_examples["attention_mask"].append(
+                overflow_tokenized_seqs["attention_mask"].append(
                     [0] * self.config.data.max_seq_length
                 )
-                negative_sampled_examples["token_type_ids"].append(
+                overflow_tokenized_seqs["token_type_ids"].append(
                     [0] * self.config.data.max_seq_length
                 )
                 cnt_overflow += 1
 
-        return negative_sampled_examples
+            while (
+                len(sample_mapping) > example_idx
+                and sample_mapping[example_idx] == sample_idx
+            ):
+                example_idx += 1
+
+        return overflow_tokenized_seqs
+
+    def sparse_neg_sampling_v1(self, examples):
+        p_with_neg = []
+        for context, negative_sample in zip(
+            examples["context"], examples["negative_sample"]
+        ):
+            p_with_neg.append(context)
+            p_with_neg.extend(negative_sample[: self.config.data.num_neg])
+
+        tokenized_seqs = self.tokenizer(
+            p_with_neg,
+            truncation=True,
+            max_length=self.config.data.max_seq_length,
+            padding="max_length",
+        )
+        return tokenized_seqs
+
+    def sparse_neg_sampling_v2(self, examples):
+        p_with_neg = []
+        for context, negative_sample in zip(
+            examples["context"], examples["negative_sample"]
+        ):
+            p_with_neg.append(context)
+            p_with_neg.extend(negative_sample[: self.config.data.num_neg])
+
+        tokenized_seqs = self.tokenizer(
+            p_with_neg,
+            truncation=True,
+            max_length=self.config.data.max_seq_length,
+            stride=self.config.data.doc_stride,
+            return_overflowing_tokens=True,
+            padding="max_length",
+        )
+
+        pad_token_id = self.tokenizer.pad_token_id
+        sample_mapping = tokenized_seqs.pop("overflow_to_sample_mapping")
+        overflow_tokenized_seqs = {
+            "input_ids": [],
+            "attention_mask": [],
+            "token_type_ids": [],
+        }
+
+        sample_idx, example_idx = -1, 0
+        while len(sample_mapping) > example_idx:
+            cnt_overflow = 0
+            sample_idx += 1
+            while (
+                cnt_overflow < self.config.data.overflow_limit
+                and len(sample_mapping) > example_idx
+                and sample_idx == sample_mapping[example_idx]
+            ):
+                for key, value in tokenized_seqs.items():
+                    if key not in ["input_ids", "attention_mask", "token_type_ids"]:
+                        continue
+                    overflow_tokenized_seqs[key].append(value[example_idx])
+                cnt_overflow += 1
+                example_idx += 1
+
+            while cnt_overflow < self.config.data.overflow_limit:
+                overflow_tokenized_seqs["input_ids"].append(
+                    [pad_token_id] * self.config.data.max_seq_length
+                )
+                overflow_tokenized_seqs["attention_mask"].append(
+                    [0] * self.config.data.max_seq_length
+                )
+                overflow_tokenized_seqs["token_type_ids"].append(
+                    [0] * self.config.data.max_seq_length
+                )
+                cnt_overflow += 1
+
+            while (
+                len(sample_mapping) > example_idx
+                and sample_mapping[example_idx] == sample_idx
+            ):
+                example_idx += 1
+
+        return overflow_tokenized_seqs
 
     def preprocessing(self, examples):
 
         q_seqs = self.tokenizer(
-            examples["question"][:26],
+            examples["question"],
             padding="max_length",
             truncation=True,
             max_length=self.config.data.max_seq_length,
             return_tensors="pt",
         )
 
-        p_seqs = self.negative_sampling_v2(examples)
+        p_seqs = getattr(self, self.config.data.neg_sampling_method)(examples)
 
         p_seqs["input_ids"] = torch.tensor(p_seqs["input_ids"]).view(
             -1,
@@ -362,58 +477,6 @@ class RetrievalDataModule(pl.LightningDataModule):
             q_seqs["attention_mask"],
             q_seqs["token_type_ids"],
         )
-
-    """
-    def preprocessing(self, dataset):
-
-        corpus = np.array(list(set([example["context"] for example in dataset])))
-        p_with_neg = []
-
-        for context in dataset["context"]:
-            while True:
-                neg_idxs = np.random.randint(len(corpus), size=self.config.data.num_neg)
-
-                if not context in corpus[neg_idxs]:
-                    p_neg = corpus[neg_idxs]
-                    p_with_neg.append(context)
-                    p_with_neg.extend(p_neg)
-                    break
-
-        q_seqs = self.tokenizer(
-            dataset["question"],
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-            max_length=self.config.data.max_seq_length,
-        )
-
-        p_seqs = self.tokenizer(
-            p_with_neg,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-            max_length=self.config.data.max_seq_length,
-        )
-
-        p_seqs["input_ids"] = p_seqs["input_ids"].view(
-            -1, self.config.data.num_neg + 1, self.config.data.max_seq_length
-        )
-        p_seqs["attention_mask"] = p_seqs["attention_mask"].view(
-            -1, self.config.data.num_neg + 1, self.config.data.max_seq_length
-        )
-        p_seqs["token_type_ids"] = p_seqs["token_type_ids"].view(
-            -1, self.config.data.num_neg + 1, self.config.data.max_seq_length
-        )
-
-        return TensorDataset(
-            p_seqs["input_ids"],
-            p_seqs["attention_mask"],
-            p_seqs["token_type_ids"],
-            q_seqs["input_ids"],
-            q_seqs["attention_mask"],
-            q_seqs["token_type_ids"],
-        )
-    """
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(

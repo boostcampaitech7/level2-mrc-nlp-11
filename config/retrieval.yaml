@@ -1,12 +1,13 @@
 data:
   data_module: RetrievalDataModule
-  dataset_name: [default] #default, klue_mrc, squad_kor_v1
+  dataset_name: [sparse_retrieval_neg_sampling] #default, klue_mrc, squad_kor_v1
   preprocessing_num_workers: 1
   max_seq_length: 512
+  doc_stride: 64
   batch_size: 2
   num_neg: 3
-  doc_stride: 64
   overflow_limit: 3
+  neg_sampling_method: random_neg_sampling_v1
 
 model:
   plm_name: klue/bert-base
@@ -42,6 +43,7 @@ bm25:
     data_path: data/wikipedia_documents.json
     model: BM25Okapi
   morphs:
-    analyzer_name: Kkma
-    data_path: data/wikipedia_documents_kkma.json
+    analyzer_name: Kkma #currently only Kkma is available
+    data_path: data/wikipedia_documents_kkma_filtered.json
     model: BM25Okapi
+    tokenized_column: filtered_pos_text

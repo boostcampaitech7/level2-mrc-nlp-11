@@ -34,7 +34,7 @@ def main(retrieval_checkpoint, mrc_checkpoint):
 
         if not only_mrc:
             # 2. retrieve context
-            docs_score, docs_idx, docs = retrieval.search(
+            docs_score, docs_idx, docs, titles = retrieval.search(
                 eval_examples["question"], k=top_k
             )
 
@@ -66,7 +66,7 @@ def main(retrieval_checkpoint, mrc_checkpoint):
         test_examples = load_from_disk("./data/test_dataset/")["validation"]
 
         # 2. retrieve context
-        docs_score, docs_idx, docs = retrieval.search(
+        docs_score, docs_idx, docs, titles = retrieval.search(
             test_examples["question"], k=top_k
         )
 

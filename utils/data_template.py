@@ -286,57 +286,60 @@ def klue_mrc():
     final_dataset.save_to_disk(f"{parent_directory}/data/klue_mrc")
 
 
-def negative_sampling_default():
-    retrieval_checkpoint = "/Users/gj/Documents/study/level2-mrc-nlp-11/retrieval_checkpoint/tf-idf_tokenizer=klue-bert-base_ngram=[1, 1]"
-    neg_num = 3
+def sparse_retrieval_neg_sampling():
+    parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    current_directory = os.path.dirname(parent_directory)
+    retrieval_checkpoint = "/data/ephemeral/home/gj/level2-mrc-nlp-11/retrieval_checkpoints/bm25-morphs_model=BM25Okapi_tokenizer=Kkma"
+    neg_num = 10
     with open(retrieval_checkpoint, "rb") as file:
+        os.chdir(parent_directory)
         retrieval = pickle.load(file)
+        os.chdir(current_directory)
 
     default_dataset = get_dataset_list(["default"])[0]
     train_dataset = default_dataset["train"]
     validation_dataset = default_dataset["validation"]
 
-    _, _, docs, _ = retrieval.search(train_dataset["question"], k=10)
-    negative_sample_list = []
-    for idx, doc in enumerate(docs):
-        i, cnt = 0, 0
-        negative_sample = []
-        while len(doc) > i:
-            if not train_dataset["answers"][idx]["text"][0] in doc[i]:
-                negative_sample.append(doc[i])
+    _, _, retrieval_docs, _ = retrieval.search(train_dataset["question"], k=100)
+    neg_sample_list = []
+    for answers, retrieval_doc in zip(train_dataset["answers"], retrieval_docs):
+        idx, cnt = 0, 0
+        neg_sample = []
+        while len(retrieval_doc) > idx:
+            if not any(text in retrieval_doc[idx] for text in answers["text"]):
+                neg_sample.append(retrieval_doc[idx])
                 cnt += 1
                 if cnt >= neg_num:
                     break
-            i += 1
-        negative_sample_list.append(negative_sample)
-    train_dataset = train_dataset.add_column("negative_sample", negative_sample_list)
+            idx += 1
+        neg_sample_list.append(neg_sample)
+    train_dataset = train_dataset.add_column("negative_sample", neg_sample_list)
 
-    _, _, docs, _ = retrieval.search(validation_dataset["question"], k=10)
-    negative_sample_list = []
-    for idx, doc in enumerate(docs):
-        i, cnt = 0, 0
-        negative_sample = []
-        while len(doc) > i:
-            if not validation_dataset["answers"][idx]["text"][0] in doc[i]:
-                negative_sample.append(doc[i])
+    _, _, retrieval_docs, _ = retrieval.search(validation_dataset["question"], k=100)
+    neg_sample_list = []
+    for answers, retrieval_doc in zip(validation_dataset["answers"], retrieval_docs):
+        idx, cnt = 0, 0
+        neg_sample = []
+        while len(retrieval_doc) > idx:
+            if not any(text in retrieval_doc[idx] for text in answers["text"]):
+                neg_sample.append(retrieval_doc[idx])
                 cnt += 1
                 if cnt >= neg_num:
                     break
-            i += 1
-        negative_sample_list.append(negative_sample)
+            idx += 1
+        neg_sample_list.append(neg_sample)
     validation_dataset = validation_dataset.add_column(
-        "negative_sample", negative_sample_list
+        "negative_sample", neg_sample_list
     )
 
     final_dataset = DatasetDict(
         {"train": train_dataset, "validation": validation_dataset}
     )
 
-    parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if not os.path.exists(f"{parent_directory}/data/"):
         os.makedirs(f"{parent_directory}/data/")
-    final_dataset.save_to_disk(f"{parent_directory}/data/negative_sampling_default")
+    final_dataset.save_to_disk(f"{parent_directory}/data/sparse_retrieval_neg_sampling")
 
 
 if __name__ == "__main__":
-    default()
+    sparse_retrieval_neg_sampling()

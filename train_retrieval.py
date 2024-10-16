@@ -53,7 +53,7 @@ def main(config):
     )
     trainer = pl.Trainer(
         num_sanity_val_steps=0,
-        accelerator="gpu",
+        accelerator="cuda",
         devices=1,
         max_epochs=config.train.num_train_epochs,
         log_every_n_steps=1,
