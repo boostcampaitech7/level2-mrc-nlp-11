@@ -2,9 +2,12 @@ import torch
 import numpy as np
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
-import module.data as module_data
-from module.retrieval import DenseRetrieval
-import module.encoder as module_encoder
+import module.mrc_data as module_data
+from module.dense_retrieval_model import (
+    BiEncoderDenseRetrieval,
+    CrossEncoderDenseRetrieval,
+)
+import module.dense_retrieval_encoder as module_encoder
 from pytorch_lightning.callbacks import ModelCheckpoint
 from datasets import set_caching_enabled
 import hydra
@@ -25,7 +28,9 @@ set_caching_enabled(False)
 
 @hydra.main(config_path="./config", config_name="retrieval", version_base=None)
 def main(config):
+    mode = "bi"
 
+    config = config.bi if mode == "bi" else config.cross
     # 0. logger
     logger = WandbLogger(project=config.wandb.project) if config.wandb.enable else None
 
@@ -33,18 +38,17 @@ def main(config):
     data_module = getattr(module_data, config.data.data_module)(config)
 
     # 2. set model
-    # 2.1. set encoder model
-    p_encoder = getattr(module_encoder, config.model.encoder).from_pretrained(
-        config.model.plm_name
+    # 2.1. set retrieval module(=pl.LightningModule class)
+    retrieval = (
+        BiEncoderDenseRetrieval(config)
+        if mode == "bi"
+        else CrossEncoderDenseRetrieval(config)
     )
-    q_encoder = getattr(module_encoder, config.model.encoder).from_pretrained(
-        config.model.plm_name
-    )
-    # 2.2. set retrieval module(=pl.LightningModule class)
-    retrieval = DenseRetrieval(config, q_encoder, p_encoder)
 
     # 3. set trainer(=pl.Trainer) & train
-    run_name = f"{config.data.neg_sampling_method}_bz={config.data.batch_size}_lr={config.optimizer.lr}"
+    run_name = f"encoder={config.model.plm_name}_{config.data.neg_sampling_method}_bz={config.data.batch_size}_lr={config.optimizer.lr}".replace(
+        "/", "-"
+    )
     checkpoint_callback = ModelCheckpoint(
         dirpath="checkpoints",
         filename=run_name + "_{epoch:02d}-{accuracy:.2f}",
@@ -60,6 +64,7 @@ def main(config):
         max_epochs=config.train.num_train_epochs,
         log_every_n_steps=1,
         callbacks=[checkpoint_callback],
+        precision="16-mixed",
         logger=logger,
     )
     trainer.fit(model=retrieval, datamodule=data_module)

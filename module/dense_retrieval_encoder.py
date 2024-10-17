@@ -3,9 +3,11 @@ from transformers import (
     BertModel,
     RobertaPreTrainedModel,
     RobertaModel,
-    EelectraModel,
+    ElectraModel,
     ElectraPreTrainedModel,
+    AutoModelForSequenceClassification,
 )
+from torch import nn
 
 
 class BertEncoder(BertPreTrainedModel):
@@ -46,7 +48,7 @@ class ElectraEncoder(ElectraPreTrainedModel):
     def __init__(self, config):
         super(ElectraEncoder, self).__init__(config)
 
-        self.electra = EelectraModel(config)
+        self.electra = ElectraModel(config)
         self.init_weights()
 
     def forward(self, input_ids, attention_mask=None, token_type_ids=None):
@@ -55,3 +57,16 @@ class ElectraEncoder(ElectraPreTrainedModel):
         )
         cls_output = outputs.last_hidden_state[:, 0]  # shape: (batch_size, hidden_size)
         return cls_output
+
+
+class CrossEncoder(nn.Module):
+    def __init__(self, plm_name):
+        super().__init__()
+        self.plm_name = plm_name
+        self.plm = AutoModelForSequenceClassification.from_pretrained(
+            pretrained_model_name_or_path=plm_name, num_labels=1, use_auth_token=True
+        )
+
+    def forward(self, inputs):
+        x = self.plm(**inputs)["logits"]
+        return x

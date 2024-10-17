@@ -1,21 +1,11 @@
 import json, os, pickle
 from collections import defaultdict
 import numpy as np
-import torch
-import torch.nn.functional as F
-import pytorch_lightning as pl
-from datasets import concatenate_datasets
 from sklearn.feature_extraction.text import TfidfVectorizer
-from evaluate import load
 from transformers import AutoTokenizer
 import konlpy.tag as morphs_analyzer
 
-import module.loss as module_loss
-from utils.common import init_obj
 from utils import rank_bm25
-from utils.data_template import get_dataset_list
-from utils.common import init_obj
-import module.metric as module_metric
 
 
 class CombineBm25Retrieval:
@@ -193,6 +183,9 @@ class MorphsBm25Retrieval:
         titles, contexts, tokenized_contexts, contexts_key_idx_pair = [], [], [], {}
         for idx, (text, (k, tokenized_text)) in enumerate(text_key_pair.items()):
             titles.append(data[k]["title"])
+            if self.config.add_title:
+                tokenized_text = self.tokenize(data[k]["title"]) + " " + tokenized_text
+                text = data[k]["title"] + " " + text
             contexts.append(text)
             tokenized_contexts.append(tokenized_text)
             contexts_key_idx_pair[k] = idx
@@ -309,6 +302,8 @@ class SubwordBm25Retrieval:
         titles, contexts, contexts_key_idx_pair = [], [], {}
         for idx, (text, k) in enumerate(text_key_pair.items()):
             titles.append(data[k]["title"])
+            if self.config.add_title:
+                text = data[k]["title"] + " " + text
             contexts.append(text)
             contexts_key_idx_pair[k] = idx
         return titles, contexts, contexts_key_idx_pair
@@ -363,7 +358,6 @@ class TfIdfRetrieval:
 
     def __init__(self, config):
         self.config = config
-        self.titles, self.contexts, self.contexts_key_idx_pair = self.prepare_data()
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.tokenizer_name)
         self.vectorizer = TfidfVectorizer(
             tokenizer=self.tokenizer.tokenize,
@@ -371,6 +365,7 @@ class TfIdfRetrieval:
             max_features=50000,
         )
         self.sparse_embedding_matrix = None
+        self.titles, self.contexts, self.contexts_key_idx_pair = self.prepare_data()
 
     def prepare_data(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -383,6 +378,8 @@ class TfIdfRetrieval:
         titles, contexts, contexts_key_idx_pair = [], [], {}
         for idx, (text, k) in enumerate(text_key_pair.items()):
             titles.append(data[k]["title"])
+            if self.config.add_title:
+                text = data[k]["title"] + " " + text
             contexts.append(text)
             contexts_key_idx_pair[k] = idx
         return titles, np.array(contexts), contexts_key_idx_pair
@@ -436,209 +433,3 @@ class TfIdfRetrieval:
             query_score_list.append(q_scores)
 
         return docs_score, docs_idx, docs, titles, query_score_list
-
-
-class DenseRetrieval(pl.LightningModule):
-
-    def __init__(self, config, q_encoder, p_encoder):
-        super().__init__()
-        self.save_hyperparameters()
-        self.config = config
-        self.tokenizer = AutoTokenizer.from_pretrained(self.config.model.plm_name)
-        self.q_encoder = q_encoder.to(self.config.device)
-        self.p_encoder = p_encoder.to(self.config.device)
-        self.dense_embedding_matrix = None
-        self.criterion = getattr(module_loss, self.config.loss)
-        self.validation_step_outputs = {"sim_score": [], "targets": []}
-        self.metric_list = {
-            metric: {"method": load(metric), "wrapper": getattr(module_metric, metric)}
-            for metric in self.config.metric
-        }
-
-    def configure_optimizers(self):
-        trainable_params1 = list(
-            filter(lambda p: p.requires_grad, self.q_encoder.parameters())
-        )
-        trainable_params2 = list(
-            filter(lambda p: p.requires_grad, self.p_encoder.parameters())
-        )
-        trainable_params = [
-            {"params": trainable_params1},
-            {"params": trainable_params2},
-        ]
-
-        optimizer_name = self.config.optimizer.name
-        del self.config.optimizer.name
-        optimizer = init_obj(
-            optimizer_name, self.config.optimizer, torch.optim, trainable_params
-        )
-        return optimizer
-
-    def training_step(self, batch):
-        targets = torch.zeros(self.config.data.batch_size).long().to(self.config.device)
-
-        p_inputs = {
-            "input_ids": batch[0]
-            .view(
-                self.config.data.batch_size
-                * (self.config.data.num_neg + 1)
-                * self.config.data.overflow_limit,
-                -1,
-            )
-            .to(self.config.device),
-            "attention_mask": batch[1]
-            .view(
-                self.config.data.batch_size
-                * (self.config.data.num_neg + 1)
-                * self.config.data.overflow_limit,
-                -1,
-            )
-            .to(self.config.device),
-            "token_type_ids": batch[2]
-            .view(
-                self.config.data.batch_size
-                * (self.config.data.num_neg + 1)
-                * self.config.data.overflow_limit,
-                -1,
-            )
-            .to(self.config.device),
-        }
-
-        q_inputs = {
-            "input_ids": batch[3].to(self.config.device),
-            "attention_mask": batch[4].to(self.config.device),
-            "token_type_ids": batch[5].to(self.config.device),
-        }
-
-        p_outputs = self.p_encoder(**p_inputs)
-        q_outputs = self.q_encoder(**q_inputs)
-
-        p_outputs = p_outputs.view(
-            self.config.data.batch_size,
-            self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
-            -1,
-        )
-        mean_p_outputs = torch.sum(p_outputs, dim=-2)
-        q_outputs = q_outputs.view(self.config.data.batch_size, 1, -1)
-
-        similarity_scores = torch.bmm(
-            q_outputs, mean_p_outputs.transpose(-2, -1)
-        ).squeeze()
-        similarity_scores = F.log_softmax(similarity_scores, dim=-1)
-
-        loss = self.criterion(similarity_scores, targets)
-        self.log("step_train_loss", loss)
-        return {"loss": loss}
-
-    def validation_step(self, batch):
-        targets = torch.zeros(self.config.data.batch_size).long().to(self.config.device)
-
-        p_inputs = {
-            "input_ids": batch[0]
-            .view(
-                self.config.data.batch_size
-                * (self.config.data.num_neg + 1)
-                * self.config.data.overflow_limit,
-                -1,
-            )
-            .to(self.config.device),
-            "attention_mask": batch[1]
-            .view(
-                self.config.data.batch_size
-                * (self.config.data.num_neg + 1)
-                * self.config.data.overflow_limit,
-                -1,
-            )
-            .to(self.config.device),
-            "token_type_ids": batch[2]
-            .view(
-                self.config.data.batch_size
-                * (self.config.data.num_neg + 1)
-                * self.config.data.overflow_limit,
-                -1,
-            )
-            .to(self.config.device),
-        }
-
-        q_inputs = {
-            "input_ids": batch[3].to(self.config.device),
-            "attention_mask": batch[4].to(self.config.device),
-            "token_type_ids": batch[5].to(self.config.device),
-        }
-
-        p_outputs = self.p_encoder(**p_inputs)
-        q_outputs = self.q_encoder(**q_inputs)
-
-        p_outputs = p_outputs.view(
-            self.config.data.batch_size,
-            self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
-            -1,
-        )
-        mean_p_outputs = torch.sum(p_outputs, dim=-2)
-        q_outputs = q_outputs.view(self.config.data.batch_size, 1, -1)
-
-        similarity_scores = torch.bmm(
-            q_outputs, mean_p_outputs.transpose(-2, -1)
-        ).squeeze()
-        similarity_scores = F.log_softmax(similarity_scores, dim=-1)
-
-        self.validation_step_outputs["sim_score"].extend(similarity_scores.cpu())
-        self.validation_step_outputs["targets"].extend(targets.cpu())
-
-    def on_validation_epoch_end(self):
-        for k, v in self.validation_step_outputs.items():
-            self.validation_step_outputs[k] = np.array(v).squeeze()
-
-        # compute metric
-        for name, metric in self.metric_list.items():
-            metric_result = metric["wrapper"](
-                self.validation_step_outputs, metric["method"]
-            )
-            for k, v in metric_result.items():
-                self.log(k, v)
-        self.validation_step_outputs = {"sim_score": [], "targets": []}
-
-    def create_embedding_vector(self):
-        self.p_encoder.eval()
-        dataset_list = get_dataset_list(self.config.data.dataset_name)
-
-        eval_dataset = concatenate_datasets(
-            [ds["validation"] for ds in dataset_list]
-        ).select(range(100))
-        self.eval_corpus = list(set([example["context"] for example in eval_dataset]))
-
-        p_embs = []
-        for p in self.eval_corpus:
-            p = self.tokenizer(
-                p,
-                padding="max_length",
-                truncation=True,
-                return_tensors="pt",
-                max_length=self.config.data.max_seq_length,
-            )
-            p_emb = self.p_encoder(**p)
-            p_embs.append(p_emb.squeeze())
-
-        self.dense_embedding_matrix = torch.stack(p_embs).T
-
-    def search(self, query, k=1):
-        self.q_encoder.eval()
-
-        query_token = self.tokenizer(
-            [query],
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-            max_length=self.config.data.max_seq_length,
-        )
-        query_vector = self.q_encoder(**query_token)
-
-        similarity_score = torch.matmul(
-            query_vector, self.dense_embedding_matrix
-        ).squeeze()
-        sorted_idx = torch.argsort(similarity_score, dim=-1, descending=True).squeeze()
-        doc_scores = similarity_score[sorted_idx]
-
-        return doc_scores[:k], self.eval_corpus[sorted_idx[:k]]

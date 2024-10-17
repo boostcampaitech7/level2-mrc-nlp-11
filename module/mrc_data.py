@@ -499,3 +499,160 @@ class RetrievalDataModule(pl.LightningDataModule):
             batch_size=self.config.data.batch_size,
             drop_last=True,
         )
+
+
+class CrossEncoderRetrievalDataModule(pl.LightningDataModule):
+
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.tokenizer = AutoTokenizer.from_pretrained(self.config.model.plm_name)
+
+        self.train_dataset = None
+        self.eval_dataset = None
+        self.test_dataset = None
+
+    def setup(self, stage="fit"):
+
+        dataset_list = get_dataset_list(self.config.data.dataset_name)
+
+        if stage == "fit":
+            datasets = DatasetDict()
+            for split in ["train", "validation"]:
+                datasets[split] = concatenate_datasets(
+                    [ds[split] for ds in dataset_list]
+                )
+
+            train_dataset = datasets["train"]
+            eval_dataset = datasets["validation"]
+
+            self.train_dataset = self.preprocessing(train_dataset)
+            self.eval_dataset = self.preprocessing(eval_dataset)
+
+        if stage == "test":
+            test_dataset = concatenate_datasets([ds["test"] for ds in dataset_list])
+            self.test_dataset = self.preprocessing(test_dataset)
+
+    def random_neg_sampling(self, examples):
+        corpus = list(set([example["context"] for example in examples]))
+        p_with_neg = []
+
+        for context, answers in zip(examples["context"], examples["answers"]):
+            p_with_neg.append(context)
+            cnt_neg = 0
+            while cnt_neg < self.config.data.num_neg:
+                neg_idx = random.randrange(0, len(corpus))
+                if corpus[neg_idx] != context and not any(
+                    text in corpus[neg_idx] for text in answers["text"]
+                ):
+                    p_with_neg.append(corpus[neg_idx])
+                    cnt_neg += 1
+
+        return p_with_neg
+
+    def sparse_neg_sampling(self, examples):
+        p_with_neg = []
+        for context, negative_sample in zip(
+            examples["context"], examples["negative_sample"]
+        ):
+            p_with_neg.append(context)
+            p_with_neg.extend(negative_sample[: self.config.data.num_neg])
+
+        return p_with_neg
+
+    def preprocessing(self, examples):
+        pad_token_id = self.tokenizer.pad_token_id
+        p_with_neg = getattr(self, self.config.data.neg_sampling_method)(examples)
+        overflow_tokenized_seqs = {
+            "input_ids": [],
+            "attention_mask": [],
+            "token_type_ids": [],
+        }
+
+        for idx, question in enumerate(examples["question"]):
+            for i in range(self.config.data.num_neg + 1):
+                tokenized_seq = self.tokenizer(
+                    question,
+                    p_with_neg[idx * (self.config.data.num_neg + 1) + i],
+                    truncation="only_second",
+                    max_length=self.config.data.max_seq_length,
+                    stride=self.config.data.doc_stride,
+                    return_overflowing_tokens=True,
+                    padding="max_length",
+                )
+
+                sample_mapping = tokenized_seq.pop("overflow_to_sample_mapping")
+
+                cnt_overflow = 0
+                while (
+                    cnt_overflow < len(sample_mapping)
+                    and cnt_overflow < self.config.data.overflow_limit
+                ):
+                    for key, value in tokenized_seq.items():
+                        overflow_tokenized_seqs[key].append(value[cnt_overflow])
+                    cnt_overflow += 1
+
+                while cnt_overflow < self.config.data.overflow_limit:
+                    overflow_tokenized_seqs["input_ids"].append(
+                        [pad_token_id] * self.config.data.max_seq_length
+                    )
+                    overflow_tokenized_seqs["attention_mask"].append(
+                        [0] * self.config.data.max_seq_length
+                    )
+                    overflow_tokenized_seqs["token_type_ids"].append(
+                        [0] * self.config.data.max_seq_length
+                    )
+                    cnt_overflow += 1
+
+        overflow_tokenized_seqs["input_ids"] = torch.tensor(
+            overflow_tokenized_seqs["input_ids"]
+        ).view(
+            -1,
+            self.config.data.num_neg + 1,
+            self.config.data.overflow_limit,
+            self.config.data.max_seq_length,
+        )
+        overflow_tokenized_seqs["attention_mask"] = torch.tensor(
+            overflow_tokenized_seqs["attention_mask"]
+        ).view(
+            -1,
+            self.config.data.num_neg + 1,
+            self.config.data.overflow_limit,
+            self.config.data.max_seq_length,
+        )
+        overflow_tokenized_seqs["token_type_ids"] = torch.tensor(
+            overflow_tokenized_seqs["token_type_ids"]
+        ).view(
+            -1,
+            self.config.data.num_neg + 1,
+            self.config.data.overflow_limit,
+            self.config.data.max_seq_length,
+        )
+
+        return TensorDataset(
+            overflow_tokenized_seqs["input_ids"],
+            overflow_tokenized_seqs["attention_mask"],
+            # overflow_tokenized_seqs["token_type_ids"],
+        )
+
+    def train_dataloader(self):
+        return torch.utils.data.DataLoader(
+            self.train_dataset,
+            batch_size=self.config.data.batch_size,
+            shuffle=True,
+            drop_last=True,
+        )
+
+    def val_dataloader(self):
+        return torch.utils.data.DataLoader(
+            self.eval_dataset,
+            batch_size=self.config.data.batch_size,
+            drop_last=True,
+        )
+
+    def test_dataloader(self):
+        return torch.utils.data.DataLoader(
+            self.test_dataset,
+            batch_size=self.config.data.batch_size,
+            drop_last=True,
+        )
