@@ -1,8 +1,8 @@
 import glob
 import pytorch_lightning as pl
-from module.data import *
-from module.mrc import *
-from module.retrieval import *
+from module.mrc_data import *
+from module.mrc_model import *
+from module.sparse_retrieval_model import *
 from datasets import load_from_disk
 import os
 from dotenv import load_dotenv

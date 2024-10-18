@@ -1,4 +1,4 @@
-from module.retrieval import (
+from module.sparse_retrieval_model import (
     SubwordBm25Retrieval,
     MorphsBm25Retrieval,
     CombineBm25Retrieval,

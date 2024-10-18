@@ -13,7 +13,6 @@ class RetrievalDataModule(pl.LightningDataModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.tokenizer = AutoTokenizer.from_pretrained(self.config.model.plm_name)
 
         self.train_dataset = None
         self.eval_dataset = None
@@ -95,19 +94,13 @@ class RetrievalDataModule(pl.LightningDataModule):
         )
 
 
-class BiEncoderRetrievalDataModule(RetrievalDataModule):
+class BiEncoderRetrievalPreprocDataModule:
 
     def __init__(self, config):
-        super().__init__(config)
+        self.config = config
+        self.tokenizer = AutoTokenizer.from_pretrained(self.config.model.plm_name)
 
-    def process_overflow_token(self, questions, p_with_neg):
-        tokenized_questions = self.tokenizer(
-            questions,
-            truncation=True,
-            max_length=self.config.data.max_seq_length,
-            return_tensors="pt",
-            padding="max_length",
-        )
+    def process_overflow_token(self, p_with_neg):
 
         pad_token_id = self.tokenizer.pad_token_id
         overflow_tokenized_p_with_neg = {
@@ -158,16 +151,9 @@ class BiEncoderRetrievalDataModule(RetrievalDataModule):
                 and sample_mapping[example_idx] == sample_idx
             ):
                 example_idx += 1
-        return tokenized_questions, overflow_tokenized_p_with_neg
+        return overflow_tokenized_p_with_neg
 
-    def truncate_overflow_token(self, questions, p_with_neg):
-        tokenized_questions = self.tokenizer(
-            questions,
-            truncation=True,
-            max_length=self.config.data.max_seq_length,
-            return_tensors="pt",
-            padding="max_length",
-        )
+    def truncate_overflow_token(self, p_with_neg):
 
         truncate_tokenized_p_with_neg = self.tokenizer(
             p_with_neg,
@@ -175,59 +161,14 @@ class BiEncoderRetrievalDataModule(RetrievalDataModule):
             max_length=self.config.data.max_seq_length,
             padding="max_length",
         )
-        return tokenized_questions, truncate_tokenized_p_with_neg
-
-    def preprocessing(self, examples):
-        p_with_neg = getattr(self, self.config.data.neg_sampling_method)(examples)
-
-        if self.config.use_overflow_token:
-            tokenized_questions, tokenized_p_with_neg = self.process_overflow_token(
-                examples["question"], p_with_neg
-            )
-        else:
-            tokenized_questions, tokenized_p_with_neg = self.truncate_overflow_token(
-                examples["question"], p_with_neg
-            )
-
-        tokenized_p_with_neg["input_ids"] = torch.tensor(
-            tokenized_p_with_neg["input_ids"]
-        ).view(
-            -1,
-            self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
-            self.config.data.max_seq_length,
-        )
-        tokenized_p_with_neg["attention_mask"] = torch.tensor(
-            tokenized_p_with_neg["attention_mask"]
-        ).view(
-            -1,
-            self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
-            self.config.data.max_seq_length,
-        )
-        tokenized_p_with_neg["token_type_ids"] = torch.tensor(
-            tokenized_p_with_neg["token_type_ids"]
-        ).view(
-            -1,
-            self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
-            self.config.data.max_seq_length,
-        )
-
-        return TensorDataset(
-            tokenized_p_with_neg["input_ids"],
-            tokenized_p_with_neg["attention_mask"],
-            tokenized_p_with_neg["token_type_ids"],
-            tokenized_questions["input_ids"],
-            tokenized_questions["attention_mask"],
-            tokenized_questions["token_type_ids"],
-        )
+        return truncate_tokenized_p_with_neg
 
 
-class CrossEncoderRetrievalDataModule(RetrievalDataModule):
+class CrossEncoderRetrievalPreprocDataModule:
 
     def __init__(self, config):
-        super().__init__(config)
+        self.config = config
+        self.tokenizer = AutoTokenizer.from_pretrained(self.config.model.plm_name)
 
     def process_overflow_token(self, questions, p_with_neg):
         pad_token_id = self.tokenizer.pad_token_id
@@ -293,42 +234,112 @@ class CrossEncoderRetrievalDataModule(RetrievalDataModule):
 
         return truncate_tokenized_q_p
 
+
+class BiEncoderRetrievalDataModule(RetrievalDataModule):
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.preprocess_module = BiEncoderRetrievalPreprocDataModule(config)
+
+    def preprocessing(self, examples):
+        tokenized_questions = self.preprocess_module.tokenizer(
+            examples["question"],
+            truncation=True,
+            max_length=self.config.data.max_seq_length,
+            return_tensors="pt",
+            padding="max_length",
+        )
+
+        p_with_neg = getattr(self, self.config.data.neg_sampling_method)(examples)
+        if self.config.data.use_overflow_token:
+            tokenized_p_with_neg = self.preprocess_module.process_overflow_token(
+                p_with_neg
+            )
+        else:
+            tokenized_p_with_neg = self.preprocess_module.truncate_overflow_token(
+                p_with_neg
+            )
+
+        tokenized_p_with_neg["input_ids"] = torch.tensor(
+            tokenized_p_with_neg["input_ids"]
+        ).view(
+            -1,
+            self.config.data.num_neg + 1,
+            self.config.data.overflow_limit,
+            self.config.data.max_seq_length,
+        )
+        tokenized_p_with_neg["attention_mask"] = torch.tensor(
+            tokenized_p_with_neg["attention_mask"]
+        ).view(
+            -1,
+            self.config.data.num_neg + 1,
+            self.config.data.overflow_limit,
+            self.config.data.max_seq_length,
+        )
+        tokenized_p_with_neg["token_type_ids"] = torch.tensor(
+            tokenized_p_with_neg["token_type_ids"]
+        ).view(
+            -1,
+            self.config.data.num_neg + 1,
+            self.config.data.overflow_limit,
+            self.config.data.max_seq_length,
+        )
+
+        return TensorDataset(
+            tokenized_p_with_neg["input_ids"],
+            tokenized_p_with_neg["attention_mask"],
+            tokenized_p_with_neg["token_type_ids"],
+            tokenized_questions["input_ids"],
+            tokenized_questions["attention_mask"],
+            tokenized_questions["token_type_ids"],
+        )
+
+
+class CrossEncoderRetrievalDataModule(RetrievalDataModule):
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.preprocess_module = CrossEncoderRetrievalPreprocDataModule(config)
+
     def preprocessing(self, examples):
         p_with_neg = getattr(self, self.config.data.neg_sampling_method)(examples)
 
-        if self.config.use_overflow_token:
-            tokenized_q_p = self.process_overflow_token(
+        if self.config.data.use_overflow_token:
+            tokenized_q_p = self.preprocess_module.process_overflow_token(
                 examples["question"], p_with_neg
             )
         else:
-            tokenized_q_p = self.truncate_overflow_token(
+            tokenized_q_p = self.preprocess_module.truncate_overflow_token(
                 examples["question"], p_with_neg
             )
 
-            tokenized_q_p["input_ids"] = torch.tensor(tokenized_q_p["input_ids"]).view(
-                -1,
-                self.config.data.num_neg + 1,
-                self.config.data.overflow_limit,
-                self.config.data.max_seq_length,
-            )
-            tokenized_q_p["attention_mask"] = torch.tensor(
-                tokenized_q_p["attention_mask"]
-            ).view(
-                -1,
-                self.config.data.num_neg + 1,
-                self.config.data.overflow_limit,
-                self.config.data.max_seq_length,
-            )
-            tokenized_q_p["token_type_ids"] = torch.tensor(
-                tokenized_q_p["token_type_ids"]
-            ).view(
-                -1,
-                self.config.data.num_neg + 1,
-                self.config.data.overflow_limit,
-                self.config.data.max_seq_length,
-            )
+        tokenized_q_p["input_ids"] = torch.tensor(tokenized_q_p["input_ids"]).view(
+            -1,
+            self.config.data.num_neg + 1,
+            self.config.data.overflow_limit,
+            self.config.data.max_seq_length,
+        )
+        tokenized_q_p["attention_mask"] = torch.tensor(
+            tokenized_q_p["attention_mask"]
+        ).view(
+            -1,
+            self.config.data.num_neg + 1,
+            self.config.data.overflow_limit,
+            self.config.data.max_seq_length,
+        )
+        tokenized_q_p["token_type_ids"] = torch.tensor(
+            tokenized_q_p["token_type_ids"]
+        ).view(
+            -1,
+            self.config.data.num_neg + 1,
+            self.config.data.overflow_limit,
+            self.config.data.max_seq_length,
+        )
 
-        if self.config.model.encoder == "RobertaEncoder":
+        if any(
+            model_type in self.config.model.plm_name
+            for model_type in ["roberta", "Roberta"]
+        ):
             return TensorDataset(
                 tokenized_q_p["input_ids"],
                 tokenized_q_p["attention_mask"],

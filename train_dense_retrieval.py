@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
-import module.mrc_data as module_data
+import module.dense_retrieval_data as module_data
 from module.dense_retrieval_model import (
     BiEncoderDenseRetrieval,
     CrossEncoderDenseRetrieval,
@@ -46,9 +46,10 @@ def main(config):
     )
 
     # 3. set trainer(=pl.Trainer) & train
-    run_name = f"encoder={config.model.plm_name}_{config.data.neg_sampling_method}_bz={config.data.batch_size}_lr={config.optimizer.lr}".replace(
+    run_name = f"{mode}-encoder={config.model.plm_name}_{config.data.neg_sampling_method}_bz={config.data.batch_size}_lr={config.optimizer.lr}".replace(
         "/", "-"
     )
+
     checkpoint_callback = ModelCheckpoint(
         dirpath="checkpoints",
         filename=run_name + "_{epoch:02d}-{accuracy:.2f}",

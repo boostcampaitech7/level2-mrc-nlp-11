@@ -1,7 +1,6 @@
 import pytorch_lightning as pl
-import wandb
-import module.data as module_data
-from module.mrc import *
+import module.mrc_data as module_data
+from module.mrc_model import *
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from datasets import set_caching_enabled

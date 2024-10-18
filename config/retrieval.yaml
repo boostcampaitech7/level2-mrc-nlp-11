@@ -5,11 +5,12 @@ bi:
     preprocessing_num_workers: 1
     max_seq_length: 512
     doc_stride: 64
-    batch_size: 5
+    batch_size: 4
     num_neg: 3
     overflow_limit: 3
     neg_sampling_method: sparse_neg_sampling
     use_overflow_token: true
+    context_path: data/wikipedia_documents.json
   model:
     plm_name: klue/roberta-base
     encoder: RobertaEncoder
@@ -21,7 +22,7 @@ bi:
     lr: 2e-5
   train:
     output_dir: "outputs"
-    num_train_epochs: 10
+    num_train_epochs: 1
   wandb:
     enable: true
     project: ${oc.env:PROJECT_NAME}
@@ -37,10 +38,11 @@ cross:
     batch_size: 5
     num_neg: 3
     overflow_limit: 3
-    neg_sampling_method: sparse_neg_sampling
+    neg_sampling_method: sparse_neg_sampling #random_neg_sampling, sparse_neg_sampling
+    context_path: data/wikipedia_documents.json
     use_overflow_token: true
   model:
-    plm_name: klue/roberta-base
+    plm_name: snunlp/KR-ELECTRA-discriminator
     encoder: CrossEncoder
   loss: nll_loss
   metric: [accuracy]
@@ -49,7 +51,7 @@ cross:
     lr: 2e-5
   train:
     output_dir: "outputs"
-    num_train_epochs: 10
+    num_train_epochs: 1
   wandb:
     enable: true
     project: ${oc.env:PROJECT_NAME}
