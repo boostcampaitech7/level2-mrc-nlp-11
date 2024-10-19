@@ -67,6 +67,24 @@ class RetrievalDataModule(pl.LightningDataModule):
 
         return p_with_neg
 
+    def combine_neg_sampling(self, examples):
+        corpus = list(set([example["context"] for example in examples]))
+        p_with_neg = []
+        for context, negative_sample, answers in zip(
+            examples["context"], examples["negative_sample"], examples["answers"]
+        ):
+            p_with_neg.append(context)
+            p_with_neg.extend(negative_sample[: self.config.data.num_neg // 2])
+            cnt_neg = 0
+            while cnt_neg < self.config.data.num_neg // 2:
+                neg_idx = random.randrange(0, len(corpus))
+                # 만약 정답이 문서에 있을 경우 사용하지 않음
+                if corpus[neg_idx] != context:
+                    p_with_neg.append(corpus[neg_idx])
+                    cnt_neg += 1
+
+        return p_with_neg
+
     @abstractmethod
     def preprocessing(self, examples):
         assert NotImplementedError

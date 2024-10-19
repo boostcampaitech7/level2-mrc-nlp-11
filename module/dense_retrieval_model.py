@@ -277,7 +277,7 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
             self.dense_emb_matrix = torch.cat(contexts_emb).T
             print(self.dense_emb_matrix.size())
 
-    def search(self, query, k=1):
+    def search(self, query, k=1, return_sim_score=False):
         self.q_encoder.eval()
 
         tokenized_query = self.preprocess_module.tokenizer(
@@ -294,7 +294,19 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
         sorted_idx = torch.argsort(similarity_score, dim=-1, descending=True).squeeze()
         doc_scores = similarity_score[sorted_idx]
 
-        return doc_scores[:k], [self.contexts[idx] for idx in sorted_idx[:k]]
+        if return_sim_score:
+            return (
+                doc_scores[:k],
+                sorted_idx[:k],
+                [self.contexts[idx] for idx in sorted_idx[:k]],
+                similarity_score,
+            )
+
+        return (
+            doc_scores[:k],
+            sorted_idx[:k],
+            [self.contexts[idx] for idx in sorted_idx[:k]],
+        )
 
 
 class CrossEncoderDenseRetrieval(pl.LightningModule):
