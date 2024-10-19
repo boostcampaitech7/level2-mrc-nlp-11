@@ -226,6 +226,7 @@ class CrossEncoderRetrievalPreprocDataModule:
                 tokenized_q_p = self.tokenizer(
                     question,
                     p_with_neg[question_idx * (self.config.data.num_neg + 1) + i],
+                    truncation=True,
                     max_length=self.config.data.max_seq_length,
                     padding="max_length",
                 )
@@ -255,35 +256,55 @@ class BiEncoderRetrievalDataModule(RetrievalDataModule):
             tokenized_p_with_neg = self.preprocess_module.process_overflow_token(
                 p_with_neg
             )
+            tokenized_p_with_neg["input_ids"] = torch.tensor(
+                tokenized_p_with_neg["input_ids"]
+            ).view(
+                -1,
+                self.config.data.num_neg + 1,
+                self.config.data.overflow_limit,
+                self.config.data.max_seq_length,
+            )
+            tokenized_p_with_neg["attention_mask"] = torch.tensor(
+                tokenized_p_with_neg["attention_mask"]
+            ).view(
+                -1,
+                self.config.data.num_neg + 1,
+                self.config.data.overflow_limit,
+                self.config.data.max_seq_length,
+            )
+            tokenized_p_with_neg["token_type_ids"] = torch.tensor(
+                tokenized_p_with_neg["token_type_ids"]
+            ).view(
+                -1,
+                self.config.data.num_neg + 1,
+                self.config.data.overflow_limit,
+                self.config.data.max_seq_length,
+            )
         else:
             tokenized_p_with_neg = self.preprocess_module.truncate_overflow_token(
                 p_with_neg
             )
-
-        tokenized_p_with_neg["input_ids"] = torch.tensor(
-            tokenized_p_with_neg["input_ids"]
-        ).view(
-            -1,
-            self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
-            self.config.data.max_seq_length,
-        )
-        tokenized_p_with_neg["attention_mask"] = torch.tensor(
-            tokenized_p_with_neg["attention_mask"]
-        ).view(
-            -1,
-            self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
-            self.config.data.max_seq_length,
-        )
-        tokenized_p_with_neg["token_type_ids"] = torch.tensor(
-            tokenized_p_with_neg["token_type_ids"]
-        ).view(
-            -1,
-            self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
-            self.config.data.max_seq_length,
-        )
+            tokenized_p_with_neg["input_ids"] = torch.tensor(
+                tokenized_p_with_neg["input_ids"]
+            ).view(
+                -1,
+                self.config.data.num_neg + 1,
+                self.config.data.max_seq_length,
+            )
+            tokenized_p_with_neg["attention_mask"] = torch.tensor(
+                tokenized_p_with_neg["attention_mask"]
+            ).view(
+                -1,
+                self.config.data.num_neg + 1,
+                self.config.data.max_seq_length,
+            )
+            tokenized_p_with_neg["token_type_ids"] = torch.tensor(
+                tokenized_p_with_neg["token_type_ids"]
+            ).view(
+                -1,
+                self.config.data.num_neg + 1,
+                self.config.data.max_seq_length,
+            )
 
         return TensorDataset(
             tokenized_p_with_neg["input_ids"],
@@ -308,33 +329,51 @@ class CrossEncoderRetrievalDataModule(RetrievalDataModule):
             tokenized_q_p = self.preprocess_module.process_overflow_token(
                 examples["question"], p_with_neg
             )
+            tokenized_q_p["input_ids"] = torch.tensor(tokenized_q_p["input_ids"]).view(
+                -1,
+                self.config.data.num_neg + 1,
+                self.config.data.overflow_limit,
+                self.config.data.max_seq_length,
+            )
+            tokenized_q_p["attention_mask"] = torch.tensor(
+                tokenized_q_p["attention_mask"]
+            ).view(
+                -1,
+                self.config.data.num_neg + 1,
+                self.config.data.overflow_limit,
+                self.config.data.max_seq_length,
+            )
+            tokenized_q_p["token_type_ids"] = torch.tensor(
+                tokenized_q_p["token_type_ids"]
+            ).view(
+                -1,
+                self.config.data.num_neg + 1,
+                self.config.data.overflow_limit,
+                self.config.data.max_seq_length,
+            )
         else:
             tokenized_q_p = self.preprocess_module.truncate_overflow_token(
                 examples["question"], p_with_neg
             )
-
-        tokenized_q_p["input_ids"] = torch.tensor(tokenized_q_p["input_ids"]).view(
-            -1,
-            self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
-            self.config.data.max_seq_length,
-        )
-        tokenized_q_p["attention_mask"] = torch.tensor(
-            tokenized_q_p["attention_mask"]
-        ).view(
-            -1,
-            self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
-            self.config.data.max_seq_length,
-        )
-        tokenized_q_p["token_type_ids"] = torch.tensor(
-            tokenized_q_p["token_type_ids"]
-        ).view(
-            -1,
-            self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
-            self.config.data.max_seq_length,
-        )
+            tokenized_q_p["input_ids"] = torch.tensor(tokenized_q_p["input_ids"]).view(
+                -1,
+                self.config.data.num_neg + 1,
+                self.config.data.max_seq_length,
+            )
+            tokenized_q_p["attention_mask"] = torch.tensor(
+                tokenized_q_p["attention_mask"]
+            ).view(
+                -1,
+                self.config.data.num_neg + 1,
+                self.config.data.max_seq_length,
+            )
+            tokenized_q_p["token_type_ids"] = torch.tensor(
+                tokenized_q_p["token_type_ids"]
+            ).view(
+                -1,
+                self.config.data.num_neg + 1,
+                self.config.data.max_seq_length,
+            )
 
         if any(
             model_type in self.config.model.plm_name

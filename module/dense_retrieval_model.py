@@ -102,28 +102,13 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
 
         p_inputs = {
             "input_ids": batch[0]
-            .view(
-                self.config.data.batch_size
-                * (self.config.data.num_neg + 1)
-                * self.config.data.overflow_limit,
-                -1,
-            )
+            .view(-1, self.config.data.max_seq_length)
             .to(self.config.device),
             "attention_mask": batch[1]
-            .view(
-                self.config.data.batch_size
-                * (self.config.data.num_neg + 1)
-                * self.config.data.overflow_limit,
-                -1,
-            )
+            .view(-1, self.config.data.max_seq_length)
             .to(self.config.device),
             "token_type_ids": batch[2]
-            .view(
-                self.config.data.batch_size
-                * (self.config.data.num_neg + 1)
-                * self.config.data.overflow_limit,
-                -1,
-            )
+            .view(-1, self.config.data.max_seq_length)
             .to(self.config.device),
         }
 
@@ -139,8 +124,8 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
         p_outputs = p_outputs.view(
             self.config.data.batch_size,
             self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
             -1,
+            p_outputs.size()[-1],
         )
         mean_p_outputs = torch.mean(p_outputs, dim=-2)
         q_outputs = q_outputs.view(self.config.data.batch_size, 1, -1)
@@ -159,28 +144,13 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
 
         p_inputs = {
             "input_ids": batch[0]
-            .view(
-                self.config.data.batch_size
-                * (self.config.data.num_neg + 1)
-                * self.config.data.overflow_limit,
-                -1,
-            )
+            .view(-1, self.config.data.max_seq_length)
             .to(self.config.device),
             "attention_mask": batch[1]
-            .view(
-                self.config.data.batch_size
-                * (self.config.data.num_neg + 1)
-                * self.config.data.overflow_limit,
-                -1,
-            )
+            .view(-1, self.config.data.max_seq_length)
             .to(self.config.device),
             "token_type_ids": batch[2]
-            .view(
-                self.config.data.batch_size
-                * (self.config.data.num_neg + 1)
-                * self.config.data.overflow_limit,
-                -1,
-            )
+            .view(-1, self.config.data.max_seq_length)
             .to(self.config.device),
         }
 
@@ -196,8 +166,8 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
         p_outputs = p_outputs.view(
             self.config.data.batch_size,
             self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
             -1,
+            p_outputs.size()[-1],
         )
         mean_p_outputs = torch.mean(p_outputs, dim=-2)
         q_outputs = q_outputs.view(self.config.data.batch_size, 1, -1)
@@ -236,8 +206,6 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
             self.titles.append(data[k]["title"])
             self.contexts.append(text)
             self.contexts_key_idx_pair[k] = idx
-            if idx == 100:
-                break
 
         # 2. 문서 데이터 임베딩
         self.p_encoder.eval()
@@ -255,9 +223,10 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
 
         offset = 30 * self.config.data.overflow_limit * self.config.data.batch_size
         total_len = len(tokenized_contexts["input_ids"])
+        print(total_len)
 
         with torch.no_grad():
-            for i in tqdm(range(0, total_len, offset)):
+            for i in tqdm(range(0, total_len // offset + 1)):
                 sub_tokenized_contexts = dict()
                 sub_tokenized_contexts["input_ids"] = (
                     torch.tensor(
@@ -268,6 +237,7 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
                         self.config.data.max_seq_length,
                     )
                     .to(self.config.device)
+                    .long()
                 )
                 sub_tokenized_contexts["attention_mask"] = (
                     torch.tensor(
@@ -280,6 +250,7 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
                         self.config.data.max_seq_length,
                     )
                     .to(self.config.device)
+                    .long()
                 )
                 sub_tokenized_contexts["token_type_ids"] = (
                     torch.tensor(
@@ -292,6 +263,7 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
                         self.config.data.max_seq_length,
                     )
                     .to(self.config.device)
+                    .long()
                 )
                 context_emb = self.p_encoder(**sub_tokenized_contexts)
                 mean_context_emb = torch.mean(
@@ -367,12 +339,7 @@ class CrossEncoderDenseRetrieval(pl.LightningModule):
         for idx in range(len(batch)):
             inputs[input_args[idx]] = (
                 batch[idx]
-                .view(
-                    self.config.data.batch_size
-                    * (self.config.data.num_neg + 1)
-                    * self.config.data.overflow_limit,
-                    -1,
-                )
+                .view(-1, self.config.data.max_seq_length)
                 .to(self.config.device)
             )
 
@@ -381,7 +348,7 @@ class CrossEncoderDenseRetrieval(pl.LightningModule):
         outputs = outputs.view(
             self.config.data.batch_size,
             self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
+            -1,
         )
         mean_outputs = torch.mean(outputs, dim=-1)
         similarity_scores = F.log_softmax(mean_outputs, dim=-1)
@@ -397,21 +364,14 @@ class CrossEncoderDenseRetrieval(pl.LightningModule):
         for idx in range(len(batch)):
             inputs[input_args[idx]] = (
                 batch[idx]
-                .view(
-                    self.config.data.batch_size
-                    * (self.config.data.num_neg + 1)
-                    * self.config.data.overflow_limit,
-                    -1,
-                )
+                .view(-1, self.config.data.max_seq_length)
                 .to(self.config.device)
             )
 
         outputs = self.encoder(inputs)
 
         outputs = outputs.view(
-            self.config.data.batch_size,
-            self.config.data.num_neg + 1,
-            self.config.data.overflow_limit,
+            self.config.data.batch_size, self.config.data.num_neg + 1, -1
         )
 
         mean_outputs = torch.mean(outputs, dim=-1)
@@ -466,10 +426,7 @@ class CrossEncoderDenseRetrieval(pl.LightningModule):
 
             outputs = self.encoder(tokenized_q_p)
 
-        outputs = outputs.view(
-            len(contexts) - 1,
-            self.config.data.overflow_limit,
-        )
+        outputs = outputs.view(len(contexts) - 1, -1)
         similarity_score = torch.mean(outputs, dim=-1).squeeze()
         sorted_idx = torch.argsort(similarity_score, dim=-1, descending=True).squeeze()
         doc_scores = similarity_score[sorted_idx]

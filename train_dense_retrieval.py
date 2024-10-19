@@ -32,7 +32,14 @@ def main(config):
 
     config = config.bi if mode == "bi" else config.cross
     # 0. logger
-    logger = WandbLogger(project=config.wandb.project) if config.wandb.enable else None
+    run_name = f"{mode}-encoder={config.model.plm_name}_use-overflow-token={config.data.use_overflow_token}_{config.data.neg_sampling_method}_bz={config.data.batch_size}_lr={config.optimizer.lr}".replace(
+        "/", "-"
+    )
+    logger = (
+        WandbLogger(name=run_name, project=config.wandb.project)
+        if config.wandb.enable
+        else None
+    )
 
     # 1. set data_module(=pl.LightningDataModule class)
     data_module = getattr(module_data, config.data.data_module)(config)
@@ -46,10 +53,6 @@ def main(config):
     )
 
     # 3. set trainer(=pl.Trainer) & train
-    run_name = f"{mode}-encoder={config.model.plm_name}_{config.data.neg_sampling_method}_bz={config.data.batch_size}_lr={config.optimizer.lr}".replace(
-        "/", "-"
-    )
-
     checkpoint_callback = ModelCheckpoint(
         dirpath="checkpoints",
         filename=run_name + "_{epoch:02d}-{accuracy:.2f}",
