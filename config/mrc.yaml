@@ -10,6 +10,7 @@ data:
   preproc_list: [original] # title_context_merge_token
   add_special_token: [] # <TITLE>, <TITLE_END>
   remove_columns: [token_type_ids] #token_type_ids
+  augmentation: [] # modify_question, add_modified_question
 model:
   plm_name: klue/roberta-large
 

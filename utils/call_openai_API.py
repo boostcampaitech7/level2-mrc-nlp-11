@@ -3,11 +3,14 @@ import aiohttp
 import json
 import re
 from tqdm import tqdm
+from dotenv import load_dotenv
+import os
 
 
 async def call_openai_API(data, batch_size, prompt_content, response_format):
+    load_dotenv()
     # 1. OpenAI API 키 설정
-    OPENAI_API_KEY = ""
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     async_request_number = 10
 
     # 3. 배치 분할 함수
@@ -40,7 +43,7 @@ async def call_openai_API(data, batch_size, prompt_content, response_format):
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are an assistant that preprocesses texts with removing wikipedia annotation representations.",
+                        "content": "You are an assistant that preprocesses texts following requirements.",
                     },
                     {"role": "user", "content": prompt},
                 ],

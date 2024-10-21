@@ -46,7 +46,6 @@ def main(retrieval_checkpooint, mrc_checkpoint):
                     ]
                     for i in range(len(docs))
                 ]
-                print(docs[0])
 
             # 3. change original context to retrieved context
             eval_examples = eval_examples.remove_columns(["context"])
@@ -79,6 +78,15 @@ def main(retrieval_checkpooint, mrc_checkpoint):
         docs_score, docs_idx, docs, titles = retrieval.search(
             test_examples["question"], k=top_k
         )
+
+        if "title_context_merge_token" in config.data.preproc_list:
+            docs = [
+                [
+                    f"<TITLE> {titles[i][j]} <TITLE_END> {docs[i][j]}"
+                    for j in range(len(docs[i]))
+                ]
+                for i in range(len(docs))
+            ]
 
         # 3. insert retrieved context column
         test_examples = test_examples.add_column(
