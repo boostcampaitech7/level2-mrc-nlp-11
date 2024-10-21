@@ -287,10 +287,10 @@ def klue_mrc():
     final_dataset.save_to_disk(f"{parent_directory}/data/klue_mrc")
 
 
-# paraphrasing된 질문을 넣은 데이터와 기존 데이터셋을 합쳐서 저장
-def add_paraphrased_question():
-    # 기존 데이터셋과 paraphrased 데이터셋을 concat해서 반환
-    def combine_default_paraphrase(dataset, paraphrased_questions):
+# paraphrasing된 질문을 넣은 데이터셋을 저장
+def paraphrased():
+    # paraphrased 데이터셋을 반환
+    def paraphrase(dataset, paraphrased_questions):
         paraphrased_data = []
         for example in dataset:
             if example["question"] in paraphrased_questions:
@@ -305,10 +305,8 @@ def add_paraphrased_question():
             paraphrased_dataset = Dataset.from_list(
                 paraphrased_data, features=get_standard_features()
             )
-            combined_dataset = concatenate_datasets([dataset, paraphrased_dataset])
-            combined_dataset = combined_dataset.shuffle(seed=42)
 
-        return combined_dataset
+        return paraphrased_dataset
 
     default_dataset_path = os.getenv("DIR_PATH") + "/level2-mrc-nlp-11/data/default"
     default_dataset = load_from_disk(default_dataset_path)
@@ -321,15 +319,16 @@ def add_paraphrased_question():
     with open(paraphrased_questions_path, "r", encoding="utf-8") as f:
         paraphrased_questions = json.load(f)
 
-    combined_train_dataset = combine_default_paraphrase(
-        train_dataset, paraphrased_questions
-    )
-    combined_validation_dataset = combine_default_paraphrase(
+    paraphrased_train_dataset = paraphrase(train_dataset, paraphrased_questions)
+    paraphrased_validation_dataset = paraphrase(
         validation_dataset, paraphrased_questions
     )
 
     final_dataset = DatasetDict(
-        {"train": combined_train_dataset, "validation": combined_validation_dataset}
+        {
+            "train": paraphrased_train_dataset,
+            "validation": paraphrased_validation_dataset,
+        }
     )
 
     parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
