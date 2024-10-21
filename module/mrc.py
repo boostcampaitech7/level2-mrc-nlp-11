@@ -6,12 +6,23 @@ import torch
 import pytorch_lightning as pl
 from transformers import AutoModelForQuestionAnswering, EvalPrediction
 from evaluate import load
-
 from utils.common import init_obj
 import module.metric as module_metric
+from konlpy.tag import Kkma
 
 
 logger = logging.getLogger(__name__)
+
+
+# 조사 제거 후처리 함수
+def postprocess(answer):
+    kkma = Kkma()
+    last_pos = kkma.pos(answer)[-1]
+    if last_pos[1] in ["JKS", "JKC", "JKG", "JKO", "JKM", "JKI", "JKQ", "JC", "JX"]:
+        position = answer.rfind(last_pos[0])
+        if position + len(last_pos[0]) == len(answer):
+            answer = answer[:position]
+    return answer
 
 
 class MrcLightningModule(pl.LightningModule):
@@ -314,7 +325,7 @@ class MrcLightningModule(pl.LightningModule):
             context = example["context"]
             for pred in predictions:
                 offsets = pred.pop("offsets")
-                pred["text"] = context[offsets[0] : offsets[1]]
+                pred["text"] = postprocess(context[offsets[0] : offsets[1]])
                 pred["start"] = offsets[0]
 
             # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
