@@ -1,4 +1,4 @@
-import sys, os, requests, tarfile, shutil, pickle, glob
+import sys, os, requests, tarfile, shutil, pickle, glob, re
 from datasets import (
     load_dataset,
     load_from_disk,
@@ -288,17 +288,22 @@ def klue_mrc():
 
 def sparse_retrieval_neg_sampling():
     parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    current_directory = os.path.dirname(parent_directory)
-    checkpoint_files = glob.glob(
-        os.path.join(current_directory + "/retrieval_checkpoints", "*")
+
+    all_files = glob.glob(
+        os.path.join(parent_directory + "/retrieval_checkpoints", "*")
     )  # 모든 .ckpt 파일 찾기
-    if checkpoint_files:
-        retrieval_checkpoint = max(checkpoint_files, key=os.path.getctime)
+    pattern = re.compile(r".*\.ckpt.*")
+    sparse_checkpoints = [file for file in all_files if not pattern.match(file)]
+    if sparse_checkpoints:
+        retrieval_checkpoint = max(sparse_checkpoints, key=os.path.getctime)
+    else:
+        raise FileNotFoundError("No checkpoint files found in the specified directory.")
+
     neg_num = 10
     with open(retrieval_checkpoint, "rb") as file:
         os.chdir(parent_directory)
         retrieval = pickle.load(file)
-        os.chdir(current_directory)
+        os.chdir(parent_directory + "/utils")
 
     default_dataset = get_dataset_list(["default"])[0]
     train_dataset = default_dataset["train"]
@@ -376,7 +381,3 @@ def sparse_retrieval_neg_sampling():
     print(
         f"minimum size of train neg sample: {train_min_len}, minimum size of val neg sample: {val_min_len}"
     )
-
-
-if __name__ == "__main__":
-    sparse_retrieval_neg_sampling()
