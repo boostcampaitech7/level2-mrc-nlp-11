@@ -118,7 +118,7 @@ class BiEncoderRetrievalPreprocDataModule:
         self.config = config
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.model.plm_name)
 
-    def process_overflow_token(self, p_with_neg):
+    def use_overflow_token(self, p_with_neg):
 
         pad_token_id = self.tokenizer.pad_token_id
         overflow_tokenized_p_with_neg = {
@@ -126,6 +126,7 @@ class BiEncoderRetrievalPreprocDataModule:
             "attention_mask": [],
             "token_type_ids": [],
         }
+        overflow_size = []
 
         tokenized_p_with_neg = self.tokenizer(
             p_with_neg,
@@ -151,7 +152,7 @@ class BiEncoderRetrievalPreprocDataModule:
                     overflow_tokenized_p_with_neg[key].append(value[example_idx])
                 cnt_overflow += 1
                 example_idx += 1
-
+            overflow_size.append(cnt_overflow)
             while cnt_overflow < self.config.data.overflow_limit:
                 overflow_tokenized_p_with_neg["input_ids"].append(
                     [pad_token_id] * self.config.data.max_seq_length
@@ -169,9 +170,9 @@ class BiEncoderRetrievalPreprocDataModule:
                 and sample_mapping[example_idx] == sample_idx
             ):
                 example_idx += 1
-        return overflow_tokenized_p_with_neg
+        return overflow_tokenized_p_with_neg, overflow_size
 
-    def truncate_overflow_token(self, p_with_neg):
+    def cut_overflow_token(self, p_with_neg):
 
         truncate_tokenized_p_with_neg = self.tokenizer(
             p_with_neg,
@@ -179,7 +180,9 @@ class BiEncoderRetrievalPreprocDataModule:
             max_length=self.config.data.max_seq_length,
             padding="max_length",
         )
-        return truncate_tokenized_p_with_neg
+        overflow_size = [1] * len(truncate_tokenized_p_with_neg)
+
+        return truncate_tokenized_p_with_neg, overflow_size
 
 
 class CrossEncoderRetrievalPreprocDataModule:
@@ -271,8 +274,8 @@ class BiEncoderRetrievalDataModule(RetrievalDataModule):
 
         p_with_neg = getattr(self, self.config.data.neg_sampling_method)(examples)
         if self.config.data.use_overflow_token:
-            tokenized_p_with_neg = self.preprocess_module.process_overflow_token(
-                p_with_neg
+            tokenized_p_with_neg, overflow_size = (
+                self.preprocess_module.use_overflow_token(p_with_neg)
             )
             tokenized_p_with_neg["input_ids"] = torch.tensor(
                 tokenized_p_with_neg["input_ids"]
@@ -299,8 +302,8 @@ class BiEncoderRetrievalDataModule(RetrievalDataModule):
                 self.config.data.max_seq_length,
             )
         else:
-            tokenized_p_with_neg = self.preprocess_module.truncate_overflow_token(
-                p_with_neg
+            tokenized_p_with_neg, overflow_size = (
+                self.preprocess_module.cut_overflow_token(p_with_neg)
             )
             tokenized_p_with_neg["input_ids"] = torch.tensor(
                 tokenized_p_with_neg["input_ids"]
@@ -323,6 +326,9 @@ class BiEncoderRetrievalDataModule(RetrievalDataModule):
                 self.config.data.num_neg + 1,
                 self.config.data.max_seq_length,
             )
+        overflow_size = torch.tensor(overflow_size).view(
+            -1, self.config.data.num_neg + 1
+        )
 
         return TensorDataset(
             tokenized_p_with_neg["input_ids"],
@@ -331,6 +337,7 @@ class BiEncoderRetrievalDataModule(RetrievalDataModule):
             tokenized_questions["input_ids"],
             tokenized_questions["attention_mask"],
             tokenized_questions["token_type_ids"],
+            overflow_size,
         )
 
 

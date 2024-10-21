@@ -54,8 +54,8 @@ class DenseRetrievalResultProvider:
             self.retrieval1_sim_score,
         ) = ([], [], [], [])
         for question in self.eval_examples["question"]:
-            doc_score, doc_idx, doc, doc_sim_score = self.retrieval_model1(
-                question, k=1, return_sim_score=True
+            doc_score, doc_idx, doc, doc_sim_score = self.retrieval_model1.search(
+                question, k=10, return_sim_score=True
             )
             self.retrieval1_docs.append(doc)
             self.retrieval1_docs_idx.append(doc_idx)
@@ -76,8 +76,8 @@ class DenseRetrievalResultProvider:
             self.retrieval1_sim_score,
         ) = ([], [], [], [])
         for question in self.eval_examples["question"]:
-            doc_score, doc_idx, doc, doc_sim_score = self.retrieval_model1(
-                question, k=1, return_sim_score=True
+            doc_score, doc_idx, doc, doc_sim_score = self.retrieval_model1.search(
+                question, k=10, return_sim_score=True
             )
             self.retrieval1_docs.append(doc)
             self.retrieval1_docs_idx.append(doc_idx)
@@ -86,16 +86,16 @@ class DenseRetrievalResultProvider:
 
         (
             self.retrieval2_docs,
-            self.retrieval2_doc_idx,
+            self.retrieval2_docs_idx,
             self.retrieval2_score,
             self.retrieval2_sim_score,
         ) = ([], [], [], [])
         for question in self.eval_examples["question"]:
-            doc_score, doc_idx, doc, doc_sim_score = self.retrieval_model2(
+            doc_score, doc_idx, doc, doc_sim_score = self.retrieval_model2.search(
                 question, k=1, return_sim_score=True
             )
             self.retrieval2_docs.append(doc)
-            self.retrieval2_doc_idx.append(doc_idx)
+            self.retrieval2_docs_idx.append(doc_idx)
             self.retrieval2_score.append(doc_score)
             self.retrieval2_sim_score.append(doc_sim_score)
 
@@ -114,13 +114,13 @@ class DenseRetrievalResultProvider:
             result["answer"] = self.eval_examples[idx]["answers"]["text"]
 
             result["answer-context"] = self.eval_examples[idx]["context"]
-            result["answer-context_retrieval1-values"] = self.retrieval1_sim_score[
+            result["answer-context_retrieval1-values"] = self.retrieval1_sim_score[idx][
                 retrieval1_correct_doc_idx
-            ]
+            ].tolist()
 
             result["retrieval1-predict-context"] = self.retrieval1_docs[idx]
             result["retrieval1-predict-context_retrieval1-values"] = (
-                self.retrieval1_score[idx]
+                self.retrieval1_score[idx].tolist()
             )
 
             result["retrieval1_is_correct"] = (
@@ -198,27 +198,27 @@ class DenseRetrievalResultProvider:
             result["answer"] = self.eval_examples[idx]["answers"]["text"]
 
             result["answer-context"] = self.eval_examples[idx]["context"]
-            result["answer-context_retrieval1-values"] = self.retrieval1_sim_score[
+            result["answer-context_retrieval1-values"] = self.retrieval1_sim_score[idx][
                 retrieval1_correct_doc_idx
             ]
-            result["answer-context_retrieval2-values"] = self.retrieval2_sim_score[
+            result["answer-context_retrieval2-values"] = self.retrieval2_sim_score[idx][
                 retrieval2_correct_doc_idx
             ]
 
             result["retrieval1-predict-context"] = self.retrieval1_docs[idx]
             result["retrieval1-predict-context_retrieval1-values"] = (
-                self.retrieval1_sim_score[retrieval1_predict1_doc_idx]
+                self.retrieval1_sim_score[idx][retrieval1_predict1_doc_idx]
             )
             result["retrieval1-predict-context_retrieval2-values"] = (
-                self.retrieval2_sim_score[retrieval2_predict1_doc_idx]
+                self.retrieval2_sim_score[idx][retrieval2_predict1_doc_idx]
             )
 
             result["retrieval2-predict-context"] = self.retrieval2_docs[idx]
             result["retrieval2-predict-context_retrieval1-values"] = (
-                self.retrieval1_sim_score[retrieval1_predict2_doc_idx]
+                self.retrieval1_sim_score[idx][retrieval1_predict2_doc_idx]
             )
             result["retrieval2-predict-context_retrieval2-values"] = (
-                self.retrieval2_sim_score[retrieval2_predict2_doc_idx]
+                self.retrieval2_sim_score[idx][retrieval2_predict2_doc_idx]
             )
 
             result["retrieval1_is_correct"] = (
@@ -346,11 +346,14 @@ class DenseRetrievalResultViewer:
         print(
             f"{self.result_method1}-PREDICT-CONTEXT: {result['retrieval1_is_correct']}"
         )
-        display(HTML(result["retrieval1-predict-context"][0]))
-        print("-" * 20)
-        print(f"{self.result_method1}-VALUE OF {self.result_method1}-PREDICT-CONTEXT: ")
-        print(f"{result['retrieval1-predict-context_retrieval1-values']}")
-        print("=" * 20)
+        for idx in range(len(result["retrieval1-prediction-context"])):
+            display(HTML(result["retrieval1-predict-context"][idx]))
+            print("-" * 20)
+            print(
+                f"{self.result_method1}-VALUE OF {self.result_method1}-PREDICT-CONTEXT: "
+            )
+            print(f"{result['retrieval1-predict-context_retrieval1-values'][idx]}")
+            print("=" * 20)
 
         display("=" * 20)
         print("ANSWER-CONTEXT: ")
@@ -374,27 +377,37 @@ class DenseRetrievalResultViewer:
         print(
             f"{self.result_method1}-PREDICT-CONTEXT: {result['retrieval1_is_correct']}"
         )
-        display(HTML(result["retrieval1-predict-context"][0]))
-        print("-" * 20)
-        print(f"{self.result_method1}-VALUE OF {self.result_method1}-PREDICT-CONTEXT: ")
-        print(result["retrieval1-predict-context_retrieval1-values"])
-        print("-" * 20)
-        print(f"{self.result_method2}-VALUE OF {self.result_method1}-PREDICT-CONTEXT: ")
-        print(result["retrieval1-predict-context_retrieval2-values"])
-        print("=" * 20)
+        for idx in range(len(result["retrieval1-prediction-context"])):
+            display(HTML(result["retrieval1-predict-context"][idx]))
+            print("-" * 20)
+            print(
+                f"{self.result_method1}-VALUE OF {self.result_method1}-PREDICT-CONTEXT: "
+            )
+            print(result["retrieval1-predict-context_retrieval1-values"][idx])
+            print("-" * 20)
+            print(
+                f"{self.result_method2}-VALUE OF {self.result_method1}-PREDICT-CONTEXT: "
+            )
+            print(result["retrieval1-predict-context_retrieval2-values"][idx])
+            print("=" * 20)
 
         display("=" * 20)
         print(
             f"{self.result_method2}-PREDICT-CONTEXT: {result['retrieval2_is_correct']}"
         )
-        display(HTML(result["retrieval2-predict-context"][0]))
-        print("-" * 20)
-        print(f"{self.result_method1}-VALUE OF {self.result_method2}-PREDICT-CONTEXT: ")
-        print(result["retrieval2-predict-context_retrieval1-values"])
-        print("-" * 20)
-        print(f"{self.result_method2}-VALUE OF {self.result_method2}-PREDICT-CONTEXT: ")
-        print(result["retrieval2-predict-context_retrieval2-values"])
-        print("=" * 20)
+        for idx in range(len(result["retrieval2-prediction-context"])):
+            display(HTML(result["retrieval2-predict-context"][idx]))
+            print("-" * 20)
+            print(
+                f"{self.result_method1}-VALUE OF {self.result_method2}-PREDICT-CONTEXT: "
+            )
+            print(result["retrieval2-predict-context_retrieval1-values"][idx])
+            print("-" * 20)
+            print(
+                f"{self.result_method2}-VALUE OF {self.result_method2}-PREDICT-CONTEXT: "
+            )
+            print(result["retrieval2-predict-context_retrieval2-values"][idx])
+            print("=" * 20)
 
         display("=" * 20)
         print("ANSWER-CONTEXT: ")
@@ -418,6 +431,11 @@ class DenseRetrievalResultViewer:
         st.markdown(f"#### 정답")
         st.write(", ".join(result["answer"]))
 
+        st.markdown(f"#### 정답 문서")
+        st.write(result["answer-context"])
+        st.markdown("**점수**")
+        st.markdown(result["answer-context_retrieval1-values"])
+
         if result["retrieval1_is_correct"]:
             st.markdown(
                 f"#### {self.result_method1} 예측 문서 (<span style='color:blue;'>예측 성공</span>)",
@@ -428,14 +446,12 @@ class DenseRetrievalResultViewer:
                 f"#### {self.result_method1} 예측 문서 (<span style='color:red;'>예측 실패</span>)",
                 unsafe_allow_html=True,
             )
-        st.write(result["retrieval1-predict-context"][0])
-        st.markdown("**점수**")
-        st.markdown(result["retrieval1-predict-context_retrieval1-values"])
-
-        st.markdown(f"#### 정답 문서")
-        st.write(result["answer-context"])
-        st.markdown("**점수**")
-        st.markdown(result["answer-context_retrieval1-values"])
+        for idx in range(len(result["retrieval1-predict-context"])):
+            st.markdown(f"**top-{idx+1} 문서**")
+            st.write(result["retrieval1-predict-context"][idx])
+            st.markdown(
+                f'점수: {result["retrieval1-predict-context_retrieval1-values"][idx]}'
+            )
 
     def streamlit_compare_query_result(self, idx):
         assert self.result_method1 != None and self.result_method2 != None
@@ -445,6 +461,12 @@ class DenseRetrievalResultViewer:
         st.markdown(f"#### 정답")
         st.write(", ".join(result["answer"]))
 
+        st.markdown(f"#### 정답 문서")
+        st.write(result["answer-context"])
+        st.markdown("**점수**")
+        st.markdown(result["answer-context_retrieval1-values"])
+        st.markdown(result["answer-context_retrieval2-values"])
+
         if result["retrieval1_is_correct"]:
             st.markdown(
                 f"#### {self.result_method1} 예측 문서 (<span style='color:blue;'>예측 성공</span>)",
@@ -455,10 +477,11 @@ class DenseRetrievalResultViewer:
                 f"#### {self.result_method1} 예측 문서 (<span style='color:red;'>예측 실패</span>)",
                 unsafe_allow_html=True,
             )
-        st.write(result["retrieval1-predict-context"][0])
-        st.markdown("*점수**")
-        st.markdown(result["retrieval1-predict-context_retrieval1-values"])
-        st.markdown(result["retrieval1-predict-context_retrieval2-values"])
+        for idx in range(len(result["retrieval1-predict-context"])):
+            st.write(result["retrieval1-predict-context"][idx])
+            st.markdown("*점수**")
+            st.markdown(result["retrieval1-predict-context_retrieval1-values"][idx])
+            st.markdown(result["retrieval1-predict-context_retrieval2-values"][idx])
 
         if result["retrieval2_is_correct"]:
             st.markdown(
@@ -470,7 +493,8 @@ class DenseRetrievalResultViewer:
                 f"#### {self.result_method2} 예측 문서 (<span style='color:red;'>예측 실패</span>)",
                 unsafe_allow_html=True,
             )
-        st.write(result["retrieval2-predict-context"][0])
-        st.markdown("**점수**")
-        st.markdown(result["retrieval2-predict-context_retrieval1-values"])
-        st.markdown(result["retrieval2-predict-context_retrieval2-values"])
+        for idx in range(len(result["retrieval1-predict-context"])):
+            st.write(result["retrieval2-predict-context"][idx])
+            st.markdown("**점수**")
+            st.markdown(result["retrieval2-predict-context_retrieval1-values"][idx])
+            st.markdown(result["retrieval2-predict-context_retrieval2-values"][idx])

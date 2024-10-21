@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 from evaluate import load
 from transformers import AutoTokenizer
+from peft import get_peft_model, LoraConfig
 
 import module.loss as module_loss
 from utils.common import init_obj
@@ -27,14 +28,28 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
         self.dense_emb_matrix = None
         self.titles, self.contexts, self.contexts_key_idx_pair = [], [], {}
 
+        if self.config.model.use_lora:
+            lora_config = LoraConfig(
+                r=8,  # 랭크 값, 모델이 얼마나 적은 파라미터로 학습할지 결정
+                lora_alpha=32,  # LoRA 알파 값
+                target_modules=[
+                    "query",
+                    "key",
+                ],  # LoRA 적용할 레이어. 예를 들어 Self-Attention의 query, key에 적용
+                lora_dropout=0.1,  # Dropout 확률
+                bias="none",  # 편향을 LoRA에 포함할지 여부 (none, all, lora-only 중 선택 가능)
+            )
+
         self.save_hyperparameters()
         if self.config.model.use_single_model:
-            self.q_encoder = self.p_encoder = (
+            encoder = (
                 getattr(module_encoder, self.config.model.encoder)
                 .from_pretrained(self.config.model.plm_name)
                 .to(self.config.device)
             )
-
+            if self.config.model.use_lora:
+                encoder = get_peft_model(encoder, lora_config)
+            self.q_encoder = self.p_encoder = encoder
         else:
             self.q_encoder = (
                 getattr(module_encoder, self.config.model.encoder)
@@ -46,6 +61,10 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
                 .from_pretrained(self.config.model.plm_name)
                 .to(self.config.device)
             )
+            if self.config.model.use_lora:
+                self.q_encoder = get_peft_model(self.q_encoder, lora_config)
+                self.p_encoder = get_peft_model(self.p_encoder, lora_config)
+
         self.criterion = getattr(module_loss, self.config.loss)
         self.validation_step_outputs = {"sim_score": [], "targets": []}
         self.metric_list = {
@@ -118,6 +137,8 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
             "token_type_ids": batch[5].to(self.config.device),
         }
 
+        overflow_size = batch[6].to(self.config.device)  # bz x num_neg + 1
+
         p_outputs = self.p_encoder(**p_inputs)
         q_outputs = self.q_encoder(**q_inputs)
 
@@ -127,7 +148,7 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
             -1,
             p_outputs.size()[-1],
         )
-        mean_p_outputs = torch.mean(p_outputs, dim=-2)
+        mean_p_outputs = torch.sum(p_outputs, dim=-2) / overflow_size.unsqueeze(-1)
         q_outputs = q_outputs.view(self.config.data.batch_size, 1, -1)
 
         similarity_scores = torch.bmm(
@@ -160,6 +181,8 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
             "token_type_ids": batch[5].to(self.config.device),
         }
 
+        overflow_size = batch[6].to(self.config.device)  # bz x num_neg + 1
+
         p_outputs = self.p_encoder(**p_inputs)
         q_outputs = self.q_encoder(**q_inputs)
 
@@ -169,7 +192,7 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
             -1,
             p_outputs.size()[-1],
         )
-        mean_p_outputs = torch.mean(p_outputs, dim=-2)
+        mean_p_outputs = torch.sum(p_outputs, dim=-2) / overflow_size.unsqueeze(-1)
         q_outputs = q_outputs.view(self.config.data.batch_size, 1, -1)
 
         similarity_scores = torch.bmm(
@@ -209,21 +232,21 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
 
         # 2. 문서 데이터 임베딩
         self.p_encoder.eval()
+        self.p_encoder = self.p_encoder.to(self.config.device)
         contexts_emb = []
 
         if self.config.data.use_overflow_token:
-            tokenized_contexts = self.preprocess_module.process_overflow_token(
-                self.contexts
+            tokenized_contexts, overflow_size = (
+                self.preprocess_module.process_overflow_token(self.contexts)
             )
         else:
-            tokenized_contexts = self.preprocess_module.truncate_overflow_token(
-                self.contexts
+            tokenized_contexts, overflow_size = (
+                self.preprocess_module.truncate_overflow_token(self.contexts)
             )
             self.config.data.overflow_limit = 1
 
         offset = 30 * self.config.data.overflow_limit * self.config.data.batch_size
         total_len = len(tokenized_contexts["input_ids"])
-        print(total_len)
 
         with torch.no_grad():
             for i in tqdm(range(0, total_len // offset + 1)):
@@ -265,17 +288,24 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
                     .to(self.config.device)
                     .long()
                 )
+                sub_overflow_size = torch.tensor(
+                    overflow_size[
+                        (offset // self.config.data.overflow_limit)
+                        * i : (offset // self.config.data.overflow_limit)
+                        * (i + 1)
+                    ]
+                ).to(self.config.device)
                 context_emb = self.p_encoder(**sub_tokenized_contexts)
-                mean_context_emb = torch.mean(
+                mean_context_emb = torch.sum(
                     context_emb.view(
                         -1, self.config.data.overflow_limit, context_emb.size()[-1]
                     ),
                     dim=-2,
-                )
+                ) / sub_overflow_size.unsqueeze(-1)
                 contexts_emb.append(mean_context_emb)
 
             self.dense_emb_matrix = torch.cat(contexts_emb).T
-            print(self.dense_emb_matrix.size())
+            print(f"dense embedding matrix shape: {self.dense_emb_matrix.size()}")
 
     def search(self, query, k=1, return_sim_score=False):
         self.q_encoder.eval()
@@ -299,7 +329,7 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
                 doc_scores[:k],
                 sorted_idx[:k],
                 [self.contexts[idx] for idx in sorted_idx[:k]],
-                similarity_score,
+                similarity_score.cpu().numpy(),
             )
 
         return (

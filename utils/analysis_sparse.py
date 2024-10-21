@@ -360,6 +360,9 @@ class SparseRetrievalResultViewer:
         return retrieval2_incorrect_query_idx
 
     def simplify_data(self, _list, return_precent=False, return_total_value=True):
+        if not isinstance(_list, list):
+            _list = [_list]
+
         sorted_by_value = sorted(
             _list, key=lambda x: -x[1][0] if isinstance(x[1], list) else -x[1]
         )
@@ -493,22 +496,26 @@ class SparseRetrievalResultViewer:
                 f"#### {self.result_method1} 예측 문서 (<span style='color:red;'>예측 실패</span>)",
                 unsafe_allow_html=True,
             )
-        st.write(result["retrieval1-predict-context"][0])
-        st.markdown("**토큰 측정 점수**")
-        df1 = pd.DataFrame(
-            self.simplify_data(result["retrieval1-predict-context_retrieval1-values"]),
-            columns=["토큰", f"{self.result_method1} 점수"],
-        )
-        st.dataframe(df1.T)
 
-        st.markdown(f"#### 정답 문서")
-        st.write(result["answer-context"])
-        st.markdown("**토큰 측정 점수**")
-        df2 = pd.DataFrame(
-            self.simplify_data(result["answer-context_retrieval1-values"]),
-            columns=["토큰", f"{self.result_method1} 점수"],
-        )
-        st.dataframe(df2.T)
+        for idx in range(len(result["retrieval1-predict-context"])):
+            st.write(result["retrieval1-predict-context"][idx])
+            st.markdown("**토큰 측정 점수**")
+            df1 = pd.DataFrame(
+                self.simplify_data(
+                    result["retrieval1-predict-context_retrieval1-values"][idx]
+                ),
+                columns=["토큰", f"{self.result_method1} 점수"],
+            )
+            st.dataframe(df1.T)
+
+            st.markdown(f"#### 정답 문서")
+            st.write(result["answer-context"])
+            st.markdown("**토큰 측정 점수**")
+            df2 = pd.DataFrame(
+                self.simplify_data(result["answer-context_retrieval1-values"][idx]),
+                columns=["토큰", f"{self.result_method1} 점수"],
+            )
+            st.dataframe(df2.T)
 
     def streamlit_compare_query_result(self, idx):
         assert self.result_method1 != None and self.result_method2 != None

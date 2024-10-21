@@ -1,13 +1,13 @@
 bi:
   data:
     data_module: BiEncoderRetrievalDataModule
-    dataset_name: [sparse_retrieval_neg_sampling]
+    dataset_name: [sparse_retrieval_neg_sampling_v2]
     preprocessing_num_workers: 1
     max_seq_length: 512
     doc_stride: 64
     batch_size: 4
     num_neg: 3
-    overflow_limit: 3
+    overflow_limit: 2
     neg_sampling_method: sparse_neg_sampling
     use_overflow_token: true
     context_path: data/wikipedia_documents.json
@@ -15,6 +15,7 @@ bi:
     plm_name: klue/roberta-base
     encoder: RobertaEncoder
     use_single_model: true
+    use_lora: false
   loss: nll_loss
   metric: [accuracy]
   optimizer:
@@ -22,7 +23,7 @@ bi:
     lr: 2e-5
   train:
     output_dir: "outputs"
-    num_train_epochs: 1
+    num_train_epochs: 10
   wandb:
     enable: true
     project: ${oc.env:PROJECT_NAME}

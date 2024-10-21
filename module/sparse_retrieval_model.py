@@ -138,7 +138,7 @@ class CombineBm25Retrieval:
             subword_doc_score, subword_query_score = self.subword_bm25.get_scores(
                 subword_token
             )
-            doc_score = 0.3 * (morphs_doc_score / max(morphs_doc_score)) + 0.7 * (
+            doc_score = 0.5 * (morphs_doc_score / max(morphs_doc_score)) + 0.5 * (
                 subword_doc_score / max(subword_doc_score)
             )
 
@@ -183,9 +183,6 @@ class MorphsBm25Retrieval:
         titles, contexts, tokenized_contexts, contexts_key_idx_pair = [], [], [], {}
         for idx, (text, (k, tokenized_text)) in enumerate(text_key_pair.items()):
             titles.append(data[k]["title"])
-            if self.config.add_title:
-                tokenized_text = self.tokenize(data[k]["title"]) + " " + tokenized_text
-                text = data[k]["title"] + " " + text
             contexts.append(text)
             tokenized_contexts.append(tokenized_text)
             contexts_key_idx_pair[k] = idx
@@ -236,7 +233,13 @@ class MorphsBm25Retrieval:
         return None
 
     def fit(self):
-        self.bm25 = getattr(rank_bm25, self.config.model)(self.tokenized_contexts)
+        if self.config.add_title:
+            tokenized_contexts = []
+            for title, tokenized_context in zip(self.titles, self.tokenized_contexts):
+                tokenized_contexts.append(self.tokenize(title) + tokenized_context)
+        else:
+            tokenized_contexts = self.tokenized_contexts
+        self.bm25 = getattr(rank_bm25, self.config.model)(tokenized_contexts)
         del self.tokenized_contexts
 
     def save(self):
@@ -302,16 +305,20 @@ class SubwordBm25Retrieval:
         titles, contexts, contexts_key_idx_pair = [], [], {}
         for idx, (text, k) in enumerate(text_key_pair.items()):
             titles.append(data[k]["title"])
-            if self.config.add_title:
-                text = data[k]["title"] + " " + text
             contexts.append(text)
             contexts_key_idx_pair[k] = idx
         return titles, contexts, contexts_key_idx_pair
 
     def fit(self):
         tokenized_contexts = []
-        for context in self.contexts:
-            tokenized_contexts.append(self.tokenizer.tokenize(context))
+        if self.config.add_title:
+            for title, context in zip(self.titles, self.contexts):
+                tokenized_contexts.append(
+                    self.tokenizer.tokenize(title + " " + context)
+                )
+        else:
+            for context in self.contexts:
+                tokenized_contexts.append(self.tokenizer.tokenize(context))
         self.bm25 = getattr(rank_bm25, self.config.model)(tokenized_contexts)
 
     def save(self):
@@ -378,14 +385,19 @@ class TfIdfRetrieval:
         titles, contexts, contexts_key_idx_pair = [], [], {}
         for idx, (text, k) in enumerate(text_key_pair.items()):
             titles.append(data[k]["title"])
-            if self.config.add_title:
-                text = data[k]["title"] + " " + text
             contexts.append(text)
             contexts_key_idx_pair[k] = idx
         return titles, np.array(contexts), contexts_key_idx_pair
 
     def fit(self):
-        self.sparse_embedding_matrix = self.vectorizer.fit_transform(self.contexts)
+        if self.config.add_title:
+            contexts = [
+                title + " " + context
+                for title, context in zip(self.titles, self.contexts)
+            ]
+        else:
+            contexts = self.contexts
+        self.sparse_embedding_matrix = self.vectorizer.fit_transform(contexts)
 
     def save(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
