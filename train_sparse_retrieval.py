@@ -1,4 +1,4 @@
-from module.sparse_retrieval_model import (
+from module.retrieval import (
     SubwordBm25Retrieval,
     MorphsBm25Retrieval,
     CombineBm25Retrieval,
@@ -15,8 +15,8 @@ def main(config):
     # 1. train retrieval by wiki docs
     # retrieval = TfIdfRetrieval(config.tfidf)  # 1. subword base tf-idf
     # retrieval = SubwordBm25Retrieval(config.bm25.subword) # 2. subword base bm25
-    retrieval = MorphsBm25Retrieval(config.bm25.morphs)  # 3. morphs base bm25
-    # retrieval = CombineBm25Retrieval(config.bm25)  # 4. subword + morphs base bm25
+    # retrieval = MorphsBm25Retrieval(config.bm25.morphs)  # 3. morphs base bm25
+    retrieval = CombineBm25Retrieval(config.bm25)  # 4. subword + morphs base bm25
     retrieval.fit()
     retrieval.save()
 
@@ -25,7 +25,7 @@ def main(config):
 
     # 2. evaluate model
     # 2.1. load eval examples
-    dataset_list = get_dataset_list(config.data.dataset_name)
+    dataset_list = get_dataset_list(["default"])
     if mode == "train":
         examples = concatenate_datasets([ds["train"] for ds in dataset_list])
     elif mode == "validation":

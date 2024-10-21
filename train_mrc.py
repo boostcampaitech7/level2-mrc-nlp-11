@@ -1,22 +1,23 @@
+import hydra
+from dotenv import load_dotenv
 import pytorch_lightning as pl
-import module.mrc_data as module_data
-from module.mrc_model import *
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from datasets import set_caching_enabled
-import hydra
-from dotenv import load_dotenv
+
+from module.mrc import *
+import module.data as module_data
 
 # .env 파일 로드
 load_dotenv()
+
 # fix random seeds for reproducibility
-"""
 SEED = 123
 torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
-"""
+
 set_caching_enabled(False)
 
 

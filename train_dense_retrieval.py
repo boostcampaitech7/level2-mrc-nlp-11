@@ -1,17 +1,14 @@
 import torch
 import numpy as np
-import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger
-import module.dense_retrieval_data as module_data
-from module.dense_retrieval_model import (
-    BiEncoderDenseRetrieval,
-    CrossEncoderDenseRetrieval,
-)
-import module.dense_retrieval_encoder as module_encoder
-from pytorch_lightning.callbacks import ModelCheckpoint
-from datasets import set_caching_enabled
 import hydra
 from dotenv import load_dotenv
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import WandbLogger
+from datasets import disable_caching
+
+import module.data as module_data
+from module.retrieval import BiEncoderDenseRetrieval
 
 # .env 파일 로드
 load_dotenv()
@@ -23,18 +20,23 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
-set_caching_enabled(False)
+disable_caching()
 
 
 @hydra.main(config_path="./config", config_name="retrieval", version_base=None)
 def main(config):
-    mode = "bi"
 
-    config = config.bi if mode == "bi" else config.cross
+    config = config.bi
     # 0. logger
-    run_name = f"{mode}-encoder={config.model.plm_name}_use-overflow-token={config.data.use_overflow_token}_{config.data.neg_sampling_method}_bz={config.data.batch_size}_lr={config.optimizer.lr}".replace(
-        "/", "-"
-    )
+    if config.model.use_lora:
+        run_name = f"lora-bi-encoder={config.model.plm_name}_use-overflow-token={1 if not config.data.use_overflow_token else config.data.overflow_limit}_num-neg={config.data.num_neg}_bz={config.data.batch_size}_lr={config.optimizer.lr}".replace(
+            "/", "-"
+        )
+    else:
+        run_name = f"bi-encoder={config.model.plm_name}_use-overflow-token={1 if not config.data.use_overflow_token else config.data.overflow_limit}_num-neg={config.data.num_neg}_bz={config.data.batch_size}_lr={config.optimizer.lr}".replace(
+            "/", "-"
+        )
+
     logger = (
         WandbLogger(name=run_name, project=config.wandb.project)
         if config.wandb.enable
@@ -46,16 +48,12 @@ def main(config):
 
     # 2. set model
     # 2.1. set retrieval module(=pl.LightningModule class)
-    retrieval = (
-        BiEncoderDenseRetrieval(config)
-        if mode == "bi"
-        else CrossEncoderDenseRetrieval(config)
-    )
+    retrieval = BiEncoderDenseRetrieval(config)
 
     # 3. set trainer(=pl.Trainer) & train
     checkpoint_callback = ModelCheckpoint(
-        dirpath="checkpoints",
-        filename=run_name + "_{epoch:02d}-{accuracy:.2f}",
+        dirpath="retrieval_checkpoints",
+        filename=run_name + "_{epoch:02d}_{accuracy:.2f}",
         save_top_k=1,
         monitor="accuracy",
         mode="max",
@@ -73,9 +71,8 @@ def main(config):
     )
     trainer.fit(model=retrieval, datamodule=data_module)
 
-    # 4. test by validation dataset
-    # retrieval.create_embedding_vector()
-    # print(retrieval.search("우리나라 대통령은 누구야?"))
+    # 4. save last model
+    trainer.save_checkpoint(f"./retrieval_checkpoints/{run_name}.ckpt")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-import sys, os, requests, tarfile, shutil, pickle
+import sys, os, requests, tarfile, shutil, pickle, glob
 from datasets import (
     load_dataset,
     load_from_disk,
@@ -289,62 +289,11 @@ def klue_mrc():
 def sparse_retrieval_neg_sampling():
     parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     current_directory = os.path.dirname(parent_directory)
-    retrieval_checkpoint = "/data/ephemeral/home/gj/level2-mrc-nlp-11/retrieval_checkpoints/bm25-morphs_model=BM25Okapi_tokenizer=Kkma"
-    neg_num = 10
-    with open(retrieval_checkpoint, "rb") as file:
-        os.chdir(parent_directory)
-        retrieval = pickle.load(file)
-        os.chdir(current_directory)
-
-    default_dataset = get_dataset_list(["default"])[0]
-    train_dataset = default_dataset["train"]
-    validation_dataset = default_dataset["validation"]
-
-    _, _, retrieval_docs, _ = retrieval.search(train_dataset["question"], k=100)
-    neg_sample_list = []
-    for answers, retrieval_doc in zip(train_dataset["answers"], retrieval_docs):
-        idx, cnt = 0, 0
-        neg_sample = []
-        while len(retrieval_doc) > idx:
-            if not any(text in retrieval_doc[idx] for text in answers["text"]):
-                neg_sample.append(retrieval_doc[idx])
-                cnt += 1
-                if cnt >= neg_num:
-                    break
-            idx += 1
-        neg_sample_list.append(neg_sample)
-    train_dataset = train_dataset.add_column("negative_sample", neg_sample_list)
-
-    _, _, retrieval_docs, _ = retrieval.search(validation_dataset["question"], k=100)
-    neg_sample_list = []
-    for answers, retrieval_doc in zip(validation_dataset["answers"], retrieval_docs):
-        idx, cnt = 0, 0
-        neg_sample = []
-        while len(retrieval_doc) > idx:
-            if not any(text in retrieval_doc[idx] for text in answers["text"]):
-                neg_sample.append(retrieval_doc[idx])
-                cnt += 1
-                if cnt >= neg_num:
-                    break
-            idx += 1
-        neg_sample_list.append(neg_sample)
-    validation_dataset = validation_dataset.add_column(
-        "negative_sample", neg_sample_list
-    )
-
-    final_dataset = DatasetDict(
-        {"train": train_dataset, "validation": validation_dataset}
-    )
-
-    if not os.path.exists(f"{parent_directory}/data/"):
-        os.makedirs(f"{parent_directory}/data/")
-    final_dataset.save_to_disk(f"{parent_directory}/data/sparse_retrieval_neg_sampling")
-
-
-def sparse_retrieval_neg_sampling_v2():
-    parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    current_directory = os.path.dirname(parent_directory)
-    retrieval_checkpoint = "/data/ephemeral/home/gj/level2-mrc-nlp-11/retrieval_checkpoints/bm25-morphs_model=BM25Okapi_tokenizer=Kkma"
+    checkpoint_files = glob.glob(
+        os.path.join(current_directory + "/retrieval_checkpoints", "*")
+    )  # 모든 .ckpt 파일 찾기
+    if checkpoint_files:
+        retrieval_checkpoint = max(checkpoint_files, key=os.path.getctime)
     neg_num = 10
     with open(retrieval_checkpoint, "rb") as file:
         os.chdir(parent_directory)
@@ -423,10 +372,10 @@ def sparse_retrieval_neg_sampling_v2():
 
     if not os.path.exists(f"{parent_directory}/data/"):
         os.makedirs(f"{parent_directory}/data/")
-    final_dataset.save_to_disk(
-        f"{parent_directory}/data/sparse_retrieval_neg_sampling_v2"
+    final_dataset.save_to_disk(f"{parent_directory}/data/sparse_retrieval_neg_sampling")
+    print(
+        f"minimum size of train neg sample: {train_min_len}, minimum size of val neg sample: {val_min_len}"
     )
-    print(f"train min len: {train_min_len}, val min len: {val_min_len}")
 
 
 if __name__ == "__main__":

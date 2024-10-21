@@ -1,16 +1,16 @@
 bi:
   data:
     data_module: BiEncoderRetrievalDataModule
-    dataset_name: [sparse_retrieval_neg_sampling_v2]
+    dataset_name: [sparse_retrieval_neg_sampling]
+    context_path: data/wikipedia_documents.json
     preprocessing_num_workers: 1
     max_seq_length: 512
     doc_stride: 64
     batch_size: 4
+    neg_sampling_method: sparse_neg_sampling #sparse_neg_sampling, random_neg_sampling
     num_neg: 3
-    overflow_limit: 2
-    neg_sampling_method: sparse_neg_sampling
     use_overflow_token: true
-    context_path: data/wikipedia_documents.json
+    overflow_limit: 3
   model:
     plm_name: klue/roberta-base
     encoder: RobertaEncoder
@@ -24,35 +24,6 @@ bi:
   train:
     output_dir: "outputs"
     num_train_epochs: 10
-  wandb:
-    enable: true
-    project: ${oc.env:PROJECT_NAME}
-  device: cuda
-
-cross:
-  data:
-    data_module: CrossEncoderRetrievalDataModule
-    dataset_name: [sparse_retrieval_neg_sampling]
-    preprocessing_num_workers: 1
-    max_seq_length: 512
-    doc_stride: 64
-    batch_size: 5
-    num_neg: 3
-    overflow_limit: 3
-    neg_sampling_method: sparse_neg_sampling #random_neg_sampling, sparse_neg_sampling
-    context_path: data/wikipedia_documents.json
-    use_overflow_token: true
-  model:
-    plm_name: snunlp/KR-ELECTRA-discriminator
-    encoder: CrossEncoder
-  loss: nll_loss
-  metric: [accuracy]
-  optimizer:
-    name: Adam
-    lr: 2e-5
-  train:
-    output_dir: "outputs"
-    num_train_epochs: 1
   wandb:
     enable: true
     project: ${oc.env:PROJECT_NAME}

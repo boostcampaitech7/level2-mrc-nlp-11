@@ -3,7 +3,7 @@ import numpy as np
 from datasets import load_from_disk
 import json
 import hydra
-from module.mrc_data import *
+from module.data import *
 import pandas as pd
 
 

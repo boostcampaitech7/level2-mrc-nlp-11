@@ -3,8 +3,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from module.mrc_data import MrcDataModule
-from module.sparse_retrieval_model import TfIdfRetrieval
+from module.data import MrcDataModule
+from module.retrieval import TfIdfRetrieval
 import hydra
 import json
 import pandas as pd
