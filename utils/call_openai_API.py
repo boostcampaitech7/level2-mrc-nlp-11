@@ -38,10 +38,10 @@ async def call_openai_API(data, batch_size, prompt_content, response_format):
             prompt = f"""
                 {prompt_content}
 
-                문서 목록:
+                ## 문서 목록:
                 {docs}
 
-                응답 형식:
+                ## 응답 형식:
                 {response_format}
                 """
             headers = {
@@ -49,7 +49,7 @@ async def call_openai_API(data, batch_size, prompt_content, response_format):
                 "Authorization": f"Bearer {OPENAI_API_KEY}",
             }
             data = {
-                "model": "gpt-4o-mini",  # 더 빠른 모델 사용
+                "model": "gpt-4o-mini-2024-07-18",  # 더 빠른 모델 사용
                 "messages": [
                     {
                         "role": "system",
