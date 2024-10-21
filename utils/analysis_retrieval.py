@@ -720,9 +720,8 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
         st.write(", ".join(result["answer"]))
 
         st.markdown(f"#### 정답 문서")
+        st.markdown(f"**점수**: {result['answer-context_retrieval1-values']}")
         st.write(result["answer-context"])
-        st.markdown("**점수**")
-        st.markdown(result["answer-context_retrieval1-values"])
 
         if result["retrieval1_is_correct"]:
             st.markdown(
@@ -735,11 +734,12 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
                 unsafe_allow_html=True,
             )
         for idx in range(len(result["retrieval1-predict-context"])):
-            st.markdown(f"**top-{idx+1} 문서**")
-            st.write(result["retrieval1-predict-context"][idx])
             st.markdown(
-                f'점수: {result["retrieval1-predict-context_retrieval1-values"][idx]}'
+                f"**top-{idx+1} 문서**<br>"
+                f'**점수**: {result["retrieval1-predict-context_retrieval1-values"][idx]}',
+                unsafe_allow_html=True,
             )
+            st.write(result["retrieval1-predict-context"][idx])
 
     def streamlit_compare_query_result(self, idx):
         assert self.result_method1 != None and self.result_method2 != None
@@ -750,13 +750,12 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
         st.write(", ".join(result["answer"]))
 
         st.markdown(f"#### 정답 문서")
+        st.markdown(
+            f"**{self.result_method1} 점수**: {result['answer-context_retrieval1-values']}<br>"
+            f"**{self.result_method2} 점수**: {result['answer-context_retrieval2-values']}",
+            unsafe_allow_html=True,
+        )
         st.write(result["answer-context"])
-        st.markdown(
-            f"**{self.result_method1} 점수**: {result['answer-context_retrieval1-values']}"
-        )
-        st.markdown(
-            f"**{self.result_method2} 점수**: {result['answer-context_retrieval2-values']}"
-        )
 
         if result["retrieval1_is_correct"]:
             st.markdown(
@@ -769,13 +768,13 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
                 unsafe_allow_html=True,
             )
         for idx in range(len(result["retrieval1-predict-context"])):
+            st.markdown(
+                f"**top-{idx+1} 문서**<br>"
+                f"**{self.result_method1} 점수**: {result['retrieval1-predict-context_retrieval1-values'][idx]}<br>"
+                f"**{self.result_method2} 점수**: {result['retrieval1-predict-context_retrieval2-values'][idx]}",
+                unsafe_allow_html=True,
+            )
             st.write(result["retrieval1-predict-context"][idx])
-            st.markdown(
-                f"**{self.result_method1} 점수**: {result['retrieval1-context_retrieval1-values']}"
-            )
-            st.markdown(
-                f"**{self.result_method2} 점수**: {result['retrieval1-context_retrieval2-values']}"
-            )
 
         if result["retrieval2_is_correct"]:
             st.markdown(
@@ -787,14 +786,14 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
                 f"#### {self.result_method2} 예측 문서 (<span style='color:red;'>예측 실패</span>)",
                 unsafe_allow_html=True,
             )
-        for idx in range(len(result["retrieval1-predict-context"])):
+        for idx in range(len(result["retrieval2-predict-context"])):
+            st.markdown(
+                f"**top-{idx+1} 문서**<br>"
+                f"**{self.result_method1} 점수**: {result['retrieval1-predict-context_retrieval2-values'][idx]}<br>"
+                f"**{self.result_method2} 점수**: {result['retrieval2-predict-context_retrieval2-values'][idx]}",
+                unsafe_allow_html=True,
+            )
             st.write(result["retrieval2-predict-context"][idx])
-            st.markdown(
-                f"**{self.result_method1} 점수**: {result['retrieval2-context_retrieval1-values']}"
-            )
-            st.markdown(
-                f"**{self.result_method2} 점수**: {result['retrieval2-context_retrieval2-values']}"
-            )
 
 
 class SparseRetrievalResultViewer(RetrievalResultViewer):
