@@ -7,7 +7,6 @@ from datasets import concatenate_datasets, DatasetDict
 
 from utils.data_template import get_dataset_list
 import utils.preprocessing as preproc_module
-import utils.augmentation as augment_module
 
 
 class MrcDataModule(pl.LightningDataModule):
@@ -40,11 +39,6 @@ class MrcDataModule(pl.LightningDataModule):
                 )
             self.train_examples = datasets["train"]
             self.eval_examples = datasets["validation"]
-
-            if self.config.data.augmentation:
-                augment_func = getattr(augment_module, self.config.data.augmentation[0])
-                self.train_examples = augment_func(self.train_examples, "train")
-                self.eval_examples = augment_func(self.eval_examples, "eval")
 
             self.train_dataset, self.train_examples = self.get_dataset(
                 self.train_examples, self.prepare_train_features

@@ -11,6 +11,6 @@ bm25/
 wiki_kkma.json
 sr_inference.py
 correct_docs_idx.json
-retrieval_checkpoint
+retrieval_checkpoints/
 test.py
 .env

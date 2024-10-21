@@ -1,4 +1,4 @@
-import sys, os, requests, tarfile, shutil
+import sys, os, requests, tarfile, shutil, copy, json
 from datasets import (
     load_dataset,
     load_from_disk,
@@ -7,6 +7,7 @@ from datasets import (
     Sequence,
     Features,
     Value,
+    concatenate_datasets,
 )
 
 """
@@ -284,6 +285,57 @@ def klue_mrc():
     if not os.path.exists(f"{parent_directory}/data/"):
         os.makedirs(f"{parent_directory}/data/")
     final_dataset.save_to_disk(f"{parent_directory}/data/klue_mrc")
+
+
+# paraphrasing된 질문을 넣은 데이터와 기존 데이터셋을 합쳐서 저장
+def add_paraphrased_question():
+    # 기존 데이터셋과 paraphrased 데이터셋을 concat해서 반환
+    def combine_default_paraphrase(dataset, paraphrased_questions):
+        paraphrased_data = []
+        for example in dataset:
+            if example["question"] in paraphrased_questions:
+                paraphrased_example = copy.deepcopy(example)
+                paraphrased_example["question"] = paraphrased_questions[
+                    example["question"]
+                ]
+                paraphrased_example["id"] = example["id"] + "_paraphrased"
+                paraphrased_data.append(paraphrased_example)
+
+        if paraphrased_data:
+            paraphrased_dataset = Dataset.from_list(
+                paraphrased_data, features=get_standard_features()
+            )
+            combined_dataset = concatenate_datasets([dataset, paraphrased_dataset])
+            combined_dataset = combined_dataset.shuffle(seed=42)
+
+        return combined_dataset
+
+    default_dataset_path = os.getenv("DIR_PATH") + "/level2-mrc-nlp-11/data/default"
+    default_dataset = load_from_disk(default_dataset_path)
+    train_dataset = default_dataset["train"]
+    validation_dataset = default_dataset["validation"]
+    paraphrased_questions_path = (
+        os.getenv("DIR_PATH") + "/level2-mrc-nlp-11/data/paraphrased_questions.json"
+    )
+
+    with open(paraphrased_questions_path, "r", encoding="utf-8") as f:
+        paraphrased_questions = json.load(f)
+
+    combined_train_dataset = combine_default_paraphrase(
+        train_dataset, paraphrased_questions
+    )
+    combined_validation_dataset = combine_default_paraphrase(
+        validation_dataset, paraphrased_questions
+    )
+
+    final_dataset = DatasetDict(
+        {"train": combined_train_dataset, "validation": combined_validation_dataset}
+    )
+
+    parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if not os.path.exists(f"{parent_directory}/data/"):
+        os.makedirs(f"{parent_directory}/data/")
+    final_dataset.save_to_disk(f"{parent_directory}/data/paraphrased")
 
 
 if __name__ == "__main__":

@@ -60,8 +60,6 @@ async def call_openai_API(data, batch_size, prompt_content, response_format):
                     ].strip()
                     response_text = re.sub(r"^```json\s*", "", response_text)
                     response_text = re.sub(r"```$", "", response_text)
-                    # response_text = re.sub("\\", "\\\\", response_text)
-                    print(response_text)
                     preprocessed = json.loads(response_text)
                     return batch_index, preprocessed
             except Exception as e:
