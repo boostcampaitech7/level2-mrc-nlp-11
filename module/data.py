@@ -40,6 +40,7 @@ class MrcDataModule(pl.LightningDataModule):
                 )
             self.train_examples = datasets["train"]
             self.eval_examples = datasets["validation"]
+
             self.train_dataset, self.train_examples = self.get_dataset(
                 self.train_examples, self.prepare_train_features
             )

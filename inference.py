@@ -63,7 +63,7 @@ def main(
                     score, idx, doc, title = retrieval.search(question)
                     docs.append(doc)
 
-            # 3. calcuate retrieval accuracy
+            # 3. calculate retrieval accuracy
             cnt = 0
             for context, doc in zip(eval_examples["context"], docs):
                 if context.replace(" ", "").replace("\n", "").replace("\\n", "") in [
@@ -72,7 +72,17 @@ def main(
                     cnt += 1
             print(f"validation retrieval, total: {len(eval_examples)}, correct: {cnt}")
 
-            # 4. change original context to retrieved context
+            # 4. preprocess retrieved context
+            if config and "title_context_merge_token" in config.data.preproc_list:
+                docs = [
+                    [
+                        f"<TITLE> {titles[i][j]} <TITLE_END> {docs[i][j]}"
+                        for j in range(len(docs[i]))
+                    ]
+                    for i in range(len(docs))
+                ]
+
+            # 5. change original context to retrieved context in eval_examples
             eval_examples = eval_examples.remove_columns(["context"])
             eval_examples = eval_examples.add_column(
                 "context", [" ".join(doc) for doc in docs]
@@ -81,18 +91,18 @@ def main(
         if not run_mrc:
             return
 
-        # 5. make eval_dataset & eval_dataloader
+        # 6. make eval_dataset & eval_dataloader
         data_module = MrcDataModule(config)
         data_module.eval_dataset, preproc_eval_examples = data_module.get_dataset(
             eval_examples
         )
         val_dataloader = data_module.val_dataloader()
 
-        # 5.1. put eval examples and eval dataset to inference
+        # 6.1. put eval examples and eval dataset to inference
         mrc.eval_examples = preproc_eval_examples
         mrc.eval_dataset = data_module.eval_dataset
 
-        # 6. inference eval dataset
+        # 7. inference eval dataset
         trainer = pl.Trainer()
         trainer.validate(model=mrc, dataloaders=val_dataloader)
 
@@ -119,6 +129,15 @@ def main(
             ):
                 score, idx, doc, title = retrieval.search(question)
                 docs.append(doc)
+
+        if "title_context_merge_token" in config.data.preproc_list:
+            docs = [
+                [
+                    f"<TITLE> {titles[i][j]} <TITLE_END> {docs[i][j]}"
+                    for j in range(len(docs[i]))
+                ]
+                for i in range(len(docs))
+            ]
 
         # 3. insert retrieved context column
         test_examples = test_examples.add_column(
