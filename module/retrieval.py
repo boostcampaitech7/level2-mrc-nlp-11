@@ -788,11 +788,11 @@ class RetrievalReranker:
             doc_key: doc_score
             for doc_key, doc_score in zip(docs_key, sim_score[dense_retrieval_docs_idx])
         }
-        dense_doc_score_max = np.max(sim_score.numpy())
+        dense_doc_score_max = np.max(sim_score[dense_retrieval_docs_idx].numpy())
 
         final_docs_key_score_pair = {
-            doc_key: sparse_docs_key_score_pair[doc_key] / sparse_doc_score_max
-            + dense_docs_key_score_pair[doc_key] / dense_doc_score_max
+            doc_key: 0.5 * (sparse_docs_key_score_pair[doc_key] / sparse_doc_score_max)
+            + 0.5 * (dense_docs_key_score_pair[doc_key] / dense_doc_score_max)
             for doc_key in docs_key
         }
         final_docs_key_score_pair = sorted(

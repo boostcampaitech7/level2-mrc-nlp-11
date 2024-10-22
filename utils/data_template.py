@@ -288,19 +288,16 @@ def klue_mrc():
 
 def sparse_retrieval_neg_sampling():
     parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sparse_checkpoint_file_name = "bm25-morphs_model=BM25Okapi_tokenizer=Kkma"
 
-    all_files = glob.glob(
-        os.path.join(parent_directory + "/retrieval_checkpoints", "*")
-    )  # 모든 .ckpt 파일 찾기
-    pattern = re.compile(r".*\.ckpt.*")
-    sparse_checkpoints = [file for file in all_files if not pattern.match(file)]
-    if sparse_checkpoints:
-        retrieval_checkpoint = max(sparse_checkpoints, key=os.path.getctime)
-    else:
-        raise FileNotFoundError("No checkpoint files found in the specified directory.")
+    sparse_checkpoint_path = os.path.join(
+        parent_directory + f"/retrieval_checkpoints/{sparse_checkpoint_file_name}"
+    )
+    if not os.path.isfile(sparse_checkpoint_path):
+        raise FileNotFoundError("bm25-morphs sparse checkpoint file doesn't exist.")
 
     neg_num = 10
-    with open(retrieval_checkpoint, "rb") as file:
+    with open(sparse_checkpoint_path, "rb") as file:
         os.chdir(parent_directory)
         retrieval = pickle.load(file)
         os.chdir(parent_directory + "/utils")

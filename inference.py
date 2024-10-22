@@ -72,14 +72,14 @@ def main(
                     cnt += 1
             print(f"validation retrieval, total: {len(eval_examples)}, correct: {cnt}")
 
+            # 4. change original context to retrieved context
+            eval_examples = eval_examples.remove_columns(["context"])
+            eval_examples = eval_examples.add_column(
+                "context", [" ".join(doc) for doc in docs]
+            )
+
         if not run_mrc:
             return
-
-        # 4. change original context to retrieved context
-        eval_examples = eval_examples.remove_columns(["context"])
-        eval_examples = eval_examples.add_column(
-            "context", [" ".join(doc) for doc in docs]
-        )
 
         # 5. make eval_dataset & eval_dataloader
         data_module = MrcDataModule(config)
@@ -120,13 +120,13 @@ def main(
                 score, idx, doc, title = retrieval.search(question)
                 docs.append(doc)
 
-        if not run_mrc:
-            return
-
         # 3. insert retrieved context column
         test_examples = test_examples.add_column(
             "context", [" ".join(doc) for doc in docs]
         )
+
+        if not run_mrc:
+            return
 
         # 4. make eval_dataset & eval_dataloader
         data_module = MrcDataModule(config)
@@ -153,16 +153,16 @@ if __name__ == "__main__":
     # dense model checkpoint 경로 (없으면 None으로 설정하세요)
     dense_retrieval_checkpoint = (
         os.getenv("DIR_PATH")
-        + "/level2-mrc-nlp-11/retrieval_checkpoints/lora-bi-encoder=klue-roberta-base_use-overflow-token=True_num-neg=8_bz=4_lr=2e-05_epoch=14-accuracy=0.85.ckpt_emb-vec"
+        + "/level2-mrc-nlp-11/retrieval_checkpoints/lora-bi-encoder=klue-roberta-base_use-overflow-token=True_num-neg=8_bz=4_lr=2e-05_epoch=14-accuracy=0.85_emb-vec.ckpt"
     )
     # mrc model checkpoint 경로 (없으면 None으로 설정하세요)
-    mrc_checkpoint = "/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/checkpoints/classic-valley-65_original_default_bz=16_lr=1.6764783497920226e-05_fine_tuned_epoch=03_exact_match=71.67.ckpt"
+    mrc_checkpoint = "/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/checkpoints/fine_tuned/klue-roberta-large_korquad1.0_filtered_classic-valley-65_original_default_bz=16_lr=1.6764783497920226e-05_fine_tuned_epoch=03_exact_match=71.67.ckpt"
 
     # main() 인자
     mode = "validation"
     top_k = 10
     run_mrc = True
-    run_retrieval = False
+    run_retrieval = True
 
     # 1. 체크포인트 디렉토리 경로 예시
     checkpoints_dir = (
