@@ -6,9 +6,9 @@ import torch
 import pytorch_lightning as pl
 from transformers import AutoModelForQuestionAnswering, EvalPrediction
 from evaluate import load
-
 from utils.common import init_obj
 import module.metric as module_metric
+from konlpy.tag import Kkma
 
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ class MrcLightningModule(pl.LightningModule):
         inference_mode=None,
     ):
         super().__init__()
+        self.kkma = Kkma()
         self.save_hyperparameters()
         self.config = config
         self.model = AutoModelForQuestionAnswering.from_pretrained(
@@ -159,6 +160,15 @@ class MrcLightningModule(pl.LightningModule):
             references = [{"id": ex["id"], "answers": ex["answers"]} for ex in examples]
 
         return EvalPrediction(predictions=formatted_predictions, label_ids=references)
+
+    # 조사 제거 후처리 함수
+    def remove_last_josa(self, answer):
+        last_pos = self.kkma.pos(answer)[-1]
+        if last_pos[1] in ["JKS", "JKC", "JKG", "JKO", "JKM", "JKI", "JKQ", "JC", "JX"]:
+            position = answer.rfind(last_pos[0])
+            if position + len(last_pos[0]) == len(answer):
+                answer = answer[:position]
+        return answer
 
     def postprocess_qa_predictions(
         self,
@@ -338,7 +348,7 @@ class MrcLightningModule(pl.LightningModule):
             context = example["context"]
             for pred in predictions:
                 offsets = pred.pop("offsets")
-                pred["text"] = context[offsets[0] : offsets[1]]
+                pred["text"] = self.remove_last_josa(context[offsets[0] : offsets[1]])
                 pred["start"] = offsets[0]
 
             # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid

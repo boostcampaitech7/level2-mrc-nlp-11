@@ -139,7 +139,7 @@ def default():
     final_dataset.save_to_disk(f"{parent_directory}/data/default")
 ```
 이처럼 수정한 데이터는 아래 그림과 같은 형식이 출력되어야 합니다.
-![alt text](picture/2CCE2733-653F-4915-B7D3-63344434F2B5.png)
+![alt text](picture/hf_dataset_format_example.png)
 
 
 
