@@ -69,7 +69,7 @@ def filter_unused_document():
     )
 
     # 분할 크기 설정
-    split_size = 2  # 한 파일에 1000개의 항목씩 저장
+    split_size = 1000  # 한 파일에 1000개의 항목씩 저장
 
     for i in range(0, len(not_in_original), split_size):
         # DataFrame을 딕셔너리로 변환 후 일정 크기만큼 슬라이싱
@@ -90,7 +90,7 @@ def filter_unused_document():
 
 # OpenAI API를 활용하여 기존 미활용 문서에서 새 질문 답변을 생성하는 함수
 def create_new_document_qa():
-    for i in range(2):
+    for i in range(50):
         # 파일 경로 설정
         file_path = (
             os.getenv("DIR_PATH") + f"level2-mrc-nlp-11/data/aug_new/chunk_{i}.json"
@@ -321,6 +321,20 @@ def update_answer_start(data, directory_path):
     return add_answer_start_df
 
 
+# train, valid 데이터에 새로운 데이터 병합
+def combine_train_valid(data, directory_path):
+    # train, valid 데이터셋 불러오기
+    train_df, valid_df = load_dataset()
+
+    train_df = pd.concat([train_df, data[:-120]])
+    valid_df = pd.concat([valid_df, data[-120:]])
+
+    train_df.to_csv(directory_path + "train/train_df.csv")
+    valid_df.to_csv(directory_path + "validation/valid_df.csv")
+
+    return train_df, valid_df
+
+
 # csv -> arrow 변환 함수
 def csv_to_arrow(input_file_path, output_file_path):
     # 데이터 파일 불러오기
@@ -395,7 +409,7 @@ def delete_csv_json_in_aug_new(directory_path):
 
 
 # aug_new 폴더의 csv파일을 arrow 형식으로 변환, csv 파일 & chunk.json 파일 제거 함수
-def convert_and_cleanup():
+def convert_and_cleanup(directory_path):
     # train, valid 파일 경로 설정
     train_input_file_path = (
         os.getenv("DIR_PATH") + "level2-mrc-nlp-11/data/aug_new/train/train_df.csv"
@@ -411,22 +425,23 @@ def convert_and_cleanup():
     )
 
     # train.csv arrow 파일로 변환
-    csv_to_arrow(train_input_file_path, train_output_file_path)
+    csv_to_arrow(directory_path + "train/train_df.csv", directory_path + "train")
     # valid.csv arrow 파일로 변환
-    csv_to_arrow(valid_input_file_path, valid_output_file_path)
+    csv_to_arrow(
+        directory_path + "validation/valid_df.csv", directory_path + "validation"
+    )
 
     # csv 파일, chunk.json 파일 제거
-    delete_csv_json_in_aug_new(
-        os.getenv("DIR_PATH") + "level2-mrc-nlp-11/data/aug_new/"
-    )
+    delete_csv_json_in_aug_new(directory_path)
 
 
 if __name__ == "__main__":
     directory_path = os.getenv("DIR_PATH") + "level2-mrc-nlp-11/data/aug_new/"
     output_path = os.getenv("DIR_PATH") + "level2-mrc-nlp-11/data/aug_new/aug_new.csv"
 
-    filter_unused_document()
-    create_new_document_qa()
+    # filter_unused_document()
+    # create_new_document_qa()
     data = process_and_combine_csv(directory_path, output_path)
     answer_start_data = update_answer_start(data, directory_path)
-    convert_and_cleanup()
+    combine_train_valid(answer_start_data, directory_path)
+    convert_and_cleanup(directory_path)
