@@ -1,15 +1,17 @@
-program: train_retrieval.py
-method: bayes
+program: train_dense_retrieval.py
+method: grid
 metric:
   name: accuracy
   goal: maximize
 parameters:
-  optimizer.lr:
-    distribution: uniform
-    min: 1e-5
-    max: 3e-5
-  data.batch_size:
-    values: [1, 2, 4]
+  bi.model.plm_name:
+    values: [snunlp/KR-ELECTRA-discriminator, klue/roberta-base]
+  bi.data.use_overflow_token:
+    values: [true, false]
+  bi.data.num_neg:
+    values: [3, 10]
+  bi.data.batch_size:
+    values: [4, 12]
 
 command:
 - ${env}

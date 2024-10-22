@@ -1,4 +1,4 @@
-import sys, os, requests, tarfile, shutil, copy, json
+import sys, os, requests, tarfile, shutil, pickle, copy, json, glob, re
 from datasets import (
     load_dataset,
     load_from_disk,
@@ -286,7 +286,162 @@ def klue_mrc():
         os.makedirs(f"{parent_directory}/data/")
     final_dataset.save_to_disk(f"{parent_directory}/data/klue_mrc")
 
+# ETRI_MRC_v1 데이터셋 구조 동일하기
+def etri_mrc():
+    data_pass = "/home/ppg/Desktop/AI Tech 7기/NLP/2. MRC/try/try0/20181101_ETRI_MRC_v1.json"
+    with open(data_pass, 'r', encoding="utf-8") as f:
+        dataset = json.load(f)
 
+    formatted_dataset_dict = {
+        'title': [],
+        'context': [],
+        'question': [],
+        'id': [],
+        'answers': None,
+    }
+
+    answer_starts = []
+    answer_texts = []
+
+    for qa in dataset["data"]:
+        title = qa['title']
+        for paragraph in qa['paragraphs']:
+            context = paragraph['context']
+            for question_set in paragraph['qas']:
+                id = f"etri_{question_set['id']}" # 
+                question = question_set['question']
+
+                answer_text = [question_set['answers'][0]['text']]
+                answer_start = [question_set['answers'][0]['answer_start']]
+
+                answer_starts.append(answer_start)
+                answer_texts.append(answer_text)
+
+                formatted_dataset_dict['id'].append(id)
+                formatted_dataset_dict['question'].append(question)
+                formatted_dataset_dict['context'].append(context)
+                formatted_dataset_dict['title'].append(title)
+
+    formatted_dataset_dict['answers'] = Dataset.from_dict(
+        {
+            'text':answer_texts,
+            'answer_start':answer_starts
+        }
+    )
+
+    formatted_dataset = Dataset.from_dict(
+        formatted_dataset_dict,
+        features = get_standard_features()
+    )
+
+    split_dataset = formatted_dataset.train_test_split(test_size=0.2)
+    train_dataset = split_dataset['train']
+    validation_dataset = split_dataset['test']
+
+    final_dataset = DatasetDict(
+        {'train':train_dataset,
+         'validation':validation_dataset}
+    )
+
+    parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if not os.path.exists(f"{parent_directory}/data/"):
+        os.makedirs(f"{parent_directory}/data/")
+    final_dataset.save_to_disk(f"{parent_directory}/data/etri_mrc")
+
+def sparse_retrieval_neg_sampling():
+    parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sparse_checkpoint_file_name = "bm25-morphs_model=BM25Okapi_tokenizer=Kkma"
+
+    sparse_checkpoint_path = os.path.join(
+        parent_directory + f"/retrieval_checkpoints/{sparse_checkpoint_file_name}"
+    )
+    if not os.path.isfile(sparse_checkpoint_path):
+        raise FileNotFoundError("bm25-morphs sparse checkpoint file doesn't exist.")
+
+    neg_num = 10
+    with open(sparse_checkpoint_path, "rb") as file:
+        os.chdir(parent_directory)
+        retrieval = pickle.load(file)
+        os.chdir(parent_directory + "/utils")
+
+    default_dataset = get_dataset_list(["default"])[0]
+    train_dataset = default_dataset["train"]
+    validation_dataset = default_dataset["validation"]
+
+    train_min_len = 10
+    _, _, retrieval_docs, _ = retrieval.search(train_dataset["question"], k=100)
+    neg_sample_list = []
+    for context, retrieval_doc in zip(train_dataset["context"], retrieval_docs):
+        idx, cnt = 0, 0
+        neg_sample = []
+        while len(retrieval_doc) > idx:
+            if (
+                context.replace(" ", "").replace("\n", "").replace("\\n", "")
+                != retrieval_doc[idx]
+                .replace(" ", "")
+                .replace("\n", "")
+                .replace("\\n", "")
+            ) and (
+                retrieval_doc[idx].replace(" ", "").replace("\n", "").replace("\\n", "")
+                not in [
+                    ns.replace(" ", "").replace("\n", "").replace("\\n", "")
+                    for ns in neg_sample
+                ]
+            ):
+                neg_sample.append(retrieval_doc[idx])
+                cnt += 1
+                if cnt >= neg_num:
+                    break
+            idx += 1
+        if train_min_len > cnt:
+            train_min_len = cnt
+        neg_sample_list.append(neg_sample)
+    train_dataset = train_dataset.add_column("negative_sample", neg_sample_list)
+
+    val_min_len = 10
+    _, _, retrieval_docs, _ = retrieval.search(validation_dataset["question"], k=100)
+    neg_sample_list = []
+    for answers, retrieval_doc in zip(validation_dataset["answers"], retrieval_docs):
+        idx, cnt = 0, 0
+        neg_sample = []
+        while len(retrieval_doc) > idx:
+            if (
+                context.replace(" ", "").replace("\n", "").replace("\\n", "")
+                != retrieval_doc[idx]
+                .replace(" ", "")
+                .replace("\n", "")
+                .replace("\\n", "")
+            ) and (
+                retrieval_doc[idx].replace(" ", "").replace("\n", "").replace("\\n", "")
+                not in [
+                    ns.replace(" ", "").replace("\n", "").replace("\\n", "")
+                    for ns in neg_sample
+                ]
+            ):
+                neg_sample.append(retrieval_doc[idx])
+                cnt += 1
+                if cnt >= neg_num:
+                    break
+            idx += 1
+        if val_min_len > cnt:
+            val_min_len = cnt
+        neg_sample_list.append(neg_sample)
+    validation_dataset = validation_dataset.add_column(
+        "negative_sample", neg_sample_list
+    )
+
+    final_dataset = DatasetDict(
+        {"train": train_dataset, "validation": validation_dataset}
+    )
+
+    if not os.path.exists(f"{parent_directory}/data/"):
+        os.makedirs(f"{parent_directory}/data/")
+    final_dataset.save_to_disk(f"{parent_directory}/data/sparse_retrieval_neg_sampling")
+    print(
+        f"minimum size of train neg sample: {train_min_len}, minimum size of val neg sample: {val_min_len}"
+    )
+
+    
 # paraphrasing된 질문을 넣은 데이터셋을 저장
 def paraphrased():
     # paraphrased 데이터셋을 반환
