@@ -10,9 +10,9 @@ else
 fi
 
 SWEEP_CONFIG="./config/retrieval_sweep.yaml"
-COUNT=2
+COUNT=16
 
-use_sweep=false
+use_sweep=true
 
 # 1. Check huggingface-cli login status
 login_status=$(huggingface-cli whoami)
@@ -36,7 +36,5 @@ if [[ "${use_sweep}" = true ]]; then
     SWEEP_ID=$(echo ${SWEEP_OUTPUT} | grep -o "wandb agent .*" | cut -d' ' -f3-)
     wandb agent --count ${COUNT} ${SWEEP_ID}
 else
-    python3 train_retrieval.py
+    python3 train_dense_retrieval.py
 fi
-
-# 4. run inference.py

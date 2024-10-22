@@ -11,7 +11,7 @@ data:
   add_special_token: [] # <TITLE>, <TITLE_END>
   remove_columns: [token_type_ids] #token_type_ids
 model:
-  plm_name: klue/roberta-large
+  plm_name: klue/roberta-base
 
 metric: [squad, bleu] #squad, bleu
 

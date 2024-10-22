@@ -1,13 +1,21 @@
 import streamlit as st
-from utils.analysis_sparse import SparseRetrievalResultViewer
+from utils.analysis_retrieval import (
+    DenseRetrievalResultViewer,
+    SparseRetrievalResultViewer,
+)
 
 st.set_page_config(layout="wide", page_title="SEVEN ELEVEN MRC Data Viewer V1.0.0")
 
 
 def main():
     tab1, tab2 = st.tabs(["문서 검색 결과 살펴보기", "문서 검색 결과 비교하기"])
-    result_path = "/Users/gj/Documents/study/level2-mrc-nlp-11/data/MorphsBm25Retrieval-SubwordBm25Retrieval-compare-result.json"
-    result_viewer = SparseRetrievalResultViewer(result_path)
+    mode = "dense"
+    result_path = "/data/ephemeral/home/gj/level2-mrc-nlp-11/data/BiEncoderDenseRetrieval-BiEncoderDenseRetrieval-compare-result.json"
+
+    if mode == "dense":
+        result_viewer = DenseRetrievalResultViewer(result_path)
+    elif mode == "sparse":
+        result_viewer = SparseRetrievalResultViewer(result_path)
 
     result_method1 = result_viewer.result_method1
     result_method2 = result_viewer.result_method2

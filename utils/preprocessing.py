@@ -20,6 +20,7 @@ import re
 from konlpy.tag import Okt, Kkma
 import os
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 
@@ -100,6 +101,9 @@ def original(example):
 
 # 제목을 강조하기 위해 특정 토큰을 추가합니다.
 def title_context_merge_token(example):
+    if "title" not in example:
+        return example
+
     title = f"<TITLE> {example['title']} <TITLE_END> "
 
     # 각 답변의 시작 위치를 수정
@@ -298,5 +302,21 @@ def replace_markdown_with_doc(example):
         example["context"] = re.sub(
             pattern, r"<DOC>", example["context"], flags=re.MULTILINE
         )
+
+    return example
+
+
+# paraphrasing된 질문을 기존 데이터셋에 할당하는 함수
+def paraphrase_question(example):
+    paraphrased_questions_path = (
+        os.getenv("DIR_PATH")
+        + "/level2-mrc-nlp-11/data/paraphrased_questions_v2.json"  # _v2: 더 다양한 paraphrase
+    )
+
+    with open(paraphrased_questions_path, "r", encoding="utf-8") as f:
+        paraphrased_questions = json.load(f)
+
+    if example["question"] in paraphrased_questions.keys():
+        example["question"] = paraphrased_questions[example["question"]]
 
     return example
