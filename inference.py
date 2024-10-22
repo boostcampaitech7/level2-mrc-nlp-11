@@ -1,11 +1,11 @@
-import os, glob
+import os, glob, copy
 from dotenv import load_dotenv
 import pytorch_lightning as pl
 
 from module.data import *
 from module.mrc import *
 from module.retrieval import *
-from datasets import load_from_disk
+from datasets import load_from_disk, Dataset
 
 # .env 파일 로드
 load_dotenv()
@@ -19,12 +19,14 @@ def main(
     run_retrieval=False,
     top_k=10,
     mode="validation",
+    use_separate_inference=False,
 ):
 
     # 0. load model
     # 0.1. load mrc model
     if run_mrc:
         mrc = MrcLightningModule.load_from_checkpoint(mrc_checkpoint)
+        mrc.inference_mode = "separate" if use_separate_inference else None
     # 0.2. load retrieval model
     if run_retrieval:
         with open(sparse_retrieval_checkpoint, "rb") as file:
@@ -56,12 +58,15 @@ def main(
                 )
             else:
                 # 2.2. use rerank
-                docs = []
+                docs_score, docs_idx, docs, titles = [], [], [], []
                 for question, context in zip(
                     eval_examples["question"], eval_examples["context"]
                 ):
                     score, idx, doc, title = retrieval.search(question)
+                    docs_score.append(score)
+                    docs_idx.append(idx)
                     docs.append(doc)
+                    titles.append(title)
 
             # 3. calculate retrieval accuracy
             cnt = 0
@@ -84,9 +89,25 @@ def main(
 
             # 5. change original context to retrieved context in eval_examples
             eval_examples = eval_examples.remove_columns(["context"])
-            eval_examples = eval_examples.add_column(
-                "context", [" ".join(doc) for doc in docs]
-            )
+            # 5-1. separate inference
+            if use_separate_inference:
+                separate_eval_examples = []
+                copied_eval_examples = copy.deepcopy(eval_examples)
+                eval_examples = None
+                for i, eval_example in enumerate(copied_eval_examples):
+                    for k in range(top_k):
+                        new_eval_example = copy.deepcopy(eval_example)
+                        new_eval_example["context"] = docs[i][k]
+                        new_eval_example["doc_score"] = docs_score[i][k]
+                        new_eval_example["document_id"] = docs_idx[i][k]
+                        new_eval_example["id"] = new_eval_example["id"] + f"_top{k}"
+                        separate_eval_examples.append(new_eval_example)
+                eval_examples = Dataset.from_list(separate_eval_examples)
+            # 5-2. concat inference
+            else:
+                eval_examples = eval_examples.add_column(
+                    "context", [" ".join(doc) for doc in docs]
+                )
 
         if not run_mrc:
             return
@@ -123,12 +144,15 @@ def main(
             )
         else:
             # 2.2. use rerank
-            docs = []
+            docs_score, docs_idx, docs, titles = [], [], [], []
             for question, context in zip(
                 eval_examples["question"], eval_examples["context"]
             ):
                 score, idx, doc, title = retrieval.search(question)
+                docs_score.append(score)
+                docs_idx.append(idx)
                 docs.append(doc)
+                titles.append(title)
 
         if "title_context_merge_token" in config.data.preproc_list:
             docs = [
@@ -140,9 +164,25 @@ def main(
             ]
 
         # 3. insert retrieved context column
-        test_examples = test_examples.add_column(
-            "context", [" ".join(doc) for doc in docs]
-        )
+        # 3-1. separate inference
+        if use_separate_inference:
+            separate_test_examples = []
+            copied_test_examples = copy.deepcopy(test_examples)
+            test_examples = None
+            for i, test_example in enumerate(copied_test_examples):
+                for k in range(top_k):
+                    new_test_example = copy.deepcopy(test_example)
+                    new_test_example["context"] = docs[i][k]
+                    new_test_example["doc_score"] = docs_score[i][k]
+                    new_test_example["document_id"] = docs_idx[i][k]
+                    new_test_example["id"] = new_test_example["id"] + f"_top{k}"
+                    separate_test_examples.append(new_test_example)
+            test_examples = Dataset.from_list(separate_test_examples)
+        # 3-2. concat inference
+        else:
+            test_examples = test_examples.add_column(
+                "context", [" ".join(doc) for doc in docs]
+            )
 
         if not run_mrc:
             return
@@ -182,6 +222,7 @@ if __name__ == "__main__":
     top_k = 10
     run_mrc = True
     run_retrieval = True
+    use_separate_inference = False  # Separate Inference 사용 시 True로 설정
 
     # 1. 체크포인트 디렉토리 경로 예시
     checkpoints_dir = (
@@ -204,4 +245,5 @@ if __name__ == "__main__":
         run_retrieval,
         top_k,
         mode,
+        use_separate_inference,
     )
