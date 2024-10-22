@@ -1,21 +1,24 @@
 import json, os, pickle
+from tqdm import tqdm
 from collections import defaultdict
 import numpy as np
+import konlpy.tag as morphs_analyzer
 import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
-from datasets import concatenate_datasets
 from sklearn.feature_extraction.text import TfidfVectorizer
 from evaluate import load
 from transformers import AutoTokenizer
-import konlpy.tag as morphs_analyzer
+from peft import get_peft_model, LoraConfig
 
-import module.loss as module_loss
 from utils.common import init_obj
 from utils import rank_bm25
-from utils.data_template import get_dataset_list
-from utils.common import init_obj
+import module.loss as module_loss
 import module.metric as module_metric
+import module.encoder as module_encoder
+from module.data import (
+    BiEncoderRetrievalPreprocDataModule,
+)
 
 
 class CombineBm25Retrieval:
@@ -66,36 +69,16 @@ class CombineBm25Retrieval:
 
     def get_tag_set(self):
         if self.config.morphs.analyzer_name == "Kkma":
-            josa_tag_list = [
-                "JKS",
-                "JKC",
-                "JKG",
-                "JKO",
-                "JKM",
-                "JKI",
-                "JKQ",
-                "JC",
-                "JX",
-            ]
-            suffix_list = [
-                "EPH",
-                "EPT",
-                "EPP",
-                "EFN",
-                "EFQ",
-                "EFO",
-                "EFA",
-                "EFI",
-                "EFR",
-                "ECE",
-                "ECS",
-                "ECD",
-                "ETN",
-                "ETD",
-                "XSN",
-                "XSV",
-                "XSA",
-            ]
+            josa_tag_list = (
+                ["JKS", "JKC", "JKG"] + ["JKO", "JKM", "JKI"] + ["JKQ", "JC", "JX"]
+            )
+
+            suffix_list = (
+                ["EPH", "EPT", "EPP", "EFN"]
+                + ["EFQ", "EFO", "EFA", "EFI"]
+                + ["EFR", "ECE", "ECS", "ECD"]
+                + ["ETN", "ETD", "XSN", "XSV", "XSA"]
+            )
             etc_list = ["IC", "SF", "SE", "SS", "SP", "SO"]
             return set(josa_tag_list + suffix_list + etc_list)
         return None
@@ -148,7 +131,7 @@ class CombineBm25Retrieval:
             subword_doc_score, subword_query_score = self.subword_bm25.get_scores(
                 subword_token
             )
-            doc_score = 0.3 * (morphs_doc_score / max(morphs_doc_score)) + 0.7 * (
+            doc_score = 0.5 * (morphs_doc_score / max(morphs_doc_score)) + 0.5 * (
                 subword_doc_score / max(subword_doc_score)
             )
 
@@ -208,42 +191,27 @@ class MorphsBm25Retrieval:
 
     def get_tag_set(self):
         if self.config.analyzer_name == "Kkma":
-            josa_tag_list = [
-                "JKS",
-                "JKC",
-                "JKG",
-                "JKO",
-                "JKM",
-                "JKI",
-                "JKQ",
-                "JC",
-                "JX",
-            ]
-            suffix_list = [
-                "EPH",
-                "EPT",
-                "EPP",
-                "EFN",
-                "EFQ",
-                "EFO",
-                "EFA",
-                "EFI",
-                "EFR",
-                "ECE",
-                "ECS",
-                "ECD",
-                "ETN",
-                "ETD",
-                "XSN",
-                "XSV",
-                "XSA",
-            ]
+            josa_tag_list = (
+                ["JKS", "JKC", "JKG"] + ["JKO", "JKM", "JKI"] + ["JKQ", "JC", "JX"]
+            )
+            suffix_list = (
+                ["EPH", "EPT", "EPP", "EFN"]
+                + ["EFQ", "EFO", "EFA", "EFI"]
+                + ["EFR", "ECE", "ECS", "ECD"]
+                + ["ETN", "ETD", "XSN", "XSV", "XSA"]
+            )
             etc_list = ["IC", "SF", "SE", "SS", "SP", "SO"]
             return set(josa_tag_list + suffix_list + etc_list)
         return None
 
     def fit(self):
-        self.bm25 = getattr(rank_bm25, self.config.model)(self.tokenized_contexts)
+        if self.config.add_title:
+            tokenized_contexts = []
+            for title, tokenized_context in zip(self.titles, self.tokenized_contexts):
+                tokenized_contexts.append(self.tokenize(title) + tokenized_context)
+        else:
+            tokenized_contexts = self.tokenized_contexts
+        self.bm25 = getattr(rank_bm25, self.config.model)(tokenized_contexts)
         del self.tokenized_contexts
 
     def save(self):
@@ -315,8 +283,14 @@ class SubwordBm25Retrieval:
 
     def fit(self):
         tokenized_contexts = []
-        for context in self.contexts:
-            tokenized_contexts.append(self.tokenizer.tokenize(context))
+        if self.config.add_title:
+            for title, context in zip(self.titles, self.contexts):
+                tokenized_contexts.append(
+                    self.tokenizer.tokenize(title + " " + context)
+                )
+        else:
+            for context in self.contexts:
+                tokenized_contexts.append(self.tokenizer.tokenize(context))
         self.bm25 = getattr(rank_bm25, self.config.model)(tokenized_contexts)
 
     def save(self):
@@ -363,7 +337,6 @@ class TfIdfRetrieval:
 
     def __init__(self, config):
         self.config = config
-        self.titles, self.contexts, self.contexts_key_idx_pair = self.prepare_data()
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.tokenizer_name)
         self.vectorizer = TfidfVectorizer(
             tokenizer=self.tokenizer.tokenize,
@@ -371,6 +344,7 @@ class TfIdfRetrieval:
             max_features=50000,
         )
         self.sparse_embedding_matrix = None
+        self.titles, self.contexts, self.contexts_key_idx_pair = self.prepare_data()
 
     def prepare_data(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -388,7 +362,14 @@ class TfIdfRetrieval:
         return titles, np.array(contexts), contexts_key_idx_pair
 
     def fit(self):
-        self.sparse_embedding_matrix = self.vectorizer.fit_transform(self.contexts)
+        if self.config.add_title:
+            contexts = [
+                title + " " + context
+                for title, context in zip(self.titles, self.contexts)
+            ]
+        else:
+            contexts = self.contexts
+        self.sparse_embedding_matrix = self.vectorizer.fit_transform(contexts)
 
     def save(self):
         parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -438,16 +419,53 @@ class TfIdfRetrieval:
         return docs_score, docs_idx, docs, titles, query_score_list
 
 
-class DenseRetrieval(pl.LightningModule):
+class BiEncoderDenseRetrieval(pl.LightningModule):
 
-    def __init__(self, config, q_encoder, p_encoder):
+    def __init__(self, config):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
-        self.tokenizer = AutoTokenizer.from_pretrained(self.config.model.plm_name)
-        self.q_encoder = q_encoder.to(self.config.device)
-        self.p_encoder = p_encoder.to(self.config.device)
-        self.dense_embedding_matrix = None
+        self.preprocess_module = BiEncoderRetrievalPreprocDataModule(config)
+        self.dense_emb_matrix = None
+        self.titles, self.contexts, self.contexts_key_idx_pair = [], [], {}
+
+        if self.config.model.use_lora:
+            lora_config = LoraConfig(
+                r=8,  # 랭크 값, 모델이 얼마나 적은 파라미터로 학습할지 결정
+                lora_alpha=32,  # LoRA 알파 값
+                target_modules=[
+                    "query",
+                    "key",
+                ],  # LoRA 적용할 레이어. 예를 들어 Self-Attention의 query, key에 적용
+                lora_dropout=0.1,  # Dropout 확률
+                bias="none",  # 편향을 LoRA에 포함할지 여부 (none, all, lora-only 중 선택 가능)
+            )
+
+        self.save_hyperparameters()
+        if self.config.model.use_single_model:
+            encoder = (
+                getattr(module_encoder, self.config.model.encoder)
+                .from_pretrained(self.config.model.plm_name)
+                .to(self.config.device)
+            )
+            if self.config.model.use_lora:
+                encoder = get_peft_model(encoder, lora_config)
+            self.q_encoder = self.p_encoder = encoder
+        else:
+            self.q_encoder = (
+                getattr(module_encoder, self.config.model.encoder)
+                .from_pretrained(self.config.model.plm_name)
+                .to(self.config.device)
+            )
+            self.p_encoder = (
+                getattr(module_encoder, self.config.model.encoder)
+                .from_pretrained(self.config.model.plm_name)
+                .to(self.config.device)
+            )
+            if self.config.model.use_lora:
+                self.q_encoder = get_peft_model(self.q_encoder, lora_config)
+                self.p_encoder = get_peft_model(self.p_encoder, lora_config)
+
         self.criterion = getattr(module_loss, self.config.loss)
         self.validation_step_outputs = {"sim_score": [], "targets": []}
         self.metric_list = {
@@ -455,17 +473,48 @@ class DenseRetrieval(pl.LightningModule):
             for metric in self.config.metric
         }
 
-    def configure_optimizers(self):
-        trainable_params1 = list(
-            filter(lambda p: p.requires_grad, self.q_encoder.parameters())
-        )
-        trainable_params2 = list(
-            filter(lambda p: p.requires_grad, self.p_encoder.parameters())
-        )
-        trainable_params = [
-            {"params": trainable_params1},
-            {"params": trainable_params2},
+    def on_save_checkpoint(self, checkpoint):
+        checkpoint["hyper_parameters"]["dense_emb_matrix"] = self.dense_emb_matrix
+        checkpoint["hyper_parameters"]["titles"] = self.titles
+        checkpoint["hyper_parameters"]["contexts"] = self.contexts
+        checkpoint["hyper_parameters"][
+            "contexts_key_idx_pair"
+        ] = self.contexts_key_idx_pair
+        (
+            self.dense_emb_matrix,
+            self.titles,
+            self.contexts,
+            self.contexts_key_idx_pair,
+        ) = (None, [], [], {})
+
+    def on_load_checkpoint(self, checkpoint):
+        self.dense_emb_matrix = checkpoint["hyper_parameters"]["dense_emb_matrix"]
+        self.titles = checkpoint["hyper_parameters"]["titles"]
+        self.contexts = checkpoint["hyper_parameters"]["contexts"]
+        self.contexts_key_idx_pair = checkpoint["hyper_parameters"][
+            "contexts_key_idx_pair"
         ]
+
+    def configure_optimizers(self):
+        if self.config.model.use_single_model:
+            trainable_params = [
+                {
+                    "params": list(
+                        filter(lambda p: p.requires_grad, self.q_encoder.parameters())
+                    )
+                }
+            ]
+        else:
+            trainable_params1 = list(
+                filter(lambda p: p.requires_grad, self.q_encoder.parameters())
+            )
+            trainable_params2 = list(
+                filter(lambda p: p.requires_grad, self.p_encoder.parameters())
+            )
+            trainable_params = [
+                {"params": trainable_params1},
+                {"params": trainable_params2},
+            ]
 
         optimizer_name = self.config.optimizer.name
         del self.config.optimizer.name
@@ -479,13 +528,13 @@ class DenseRetrieval(pl.LightningModule):
 
         p_inputs = {
             "input_ids": batch[0]
-            .view(self.config.data.batch_size * (self.config.data.num_neg + 1), -1)
+            .view(-1, self.config.data.max_seq_length)
             .to(self.config.device),
             "attention_mask": batch[1]
-            .view(self.config.data.batch_size * (self.config.data.num_neg + 1), -1)
+            .view(-1, self.config.data.max_seq_length)
             .to(self.config.device),
             "token_type_ids": batch[2]
-            .view(self.config.data.batch_size * (self.config.data.num_neg + 1), -1)
+            .view(-1, self.config.data.max_seq_length)
             .to(self.config.device),
         }
 
@@ -495,15 +544,23 @@ class DenseRetrieval(pl.LightningModule):
             "token_type_ids": batch[5].to(self.config.device),
         }
 
+        overflow_size = batch[6].to(self.config.device)  # bz x num_neg + 1
+
         p_outputs = self.p_encoder(**p_inputs)
         q_outputs = self.q_encoder(**q_inputs)
 
         p_outputs = p_outputs.view(
-            self.config.data.batch_size, self.config.data.num_neg + 1, -1
+            self.config.data.batch_size,
+            self.config.data.num_neg + 1,
+            -1,
+            p_outputs.size()[-1],
         )
+        mean_p_outputs = torch.sum(p_outputs, dim=-2) / overflow_size.unsqueeze(-1)
         q_outputs = q_outputs.view(self.config.data.batch_size, 1, -1)
 
-        similarity_scores = torch.bmm(q_outputs, p_outputs.transpose(-2, -1)).squeeze()
+        similarity_scores = torch.bmm(
+            q_outputs, mean_p_outputs.transpose(-2, -1)
+        ).squeeze()
         similarity_scores = F.log_softmax(similarity_scores, dim=-1)
 
         loss = self.criterion(similarity_scores, targets)
@@ -515,13 +572,13 @@ class DenseRetrieval(pl.LightningModule):
 
         p_inputs = {
             "input_ids": batch[0]
-            .view(self.config.data.batch_size * (self.config.data.num_neg + 1), -1)
+            .view(-1, self.config.data.max_seq_length)
             .to(self.config.device),
             "attention_mask": batch[1]
-            .view(self.config.data.batch_size * (self.config.data.num_neg + 1), -1)
+            .view(-1, self.config.data.max_seq_length)
             .to(self.config.device),
             "token_type_ids": batch[2]
-            .view(self.config.data.batch_size * (self.config.data.num_neg + 1), -1)
+            .view(-1, self.config.data.max_seq_length)
             .to(self.config.device),
         }
 
@@ -531,15 +588,23 @@ class DenseRetrieval(pl.LightningModule):
             "token_type_ids": batch[5].to(self.config.device),
         }
 
+        overflow_size = batch[6].to(self.config.device)  # bz x num_neg + 1
+
         p_outputs = self.p_encoder(**p_inputs)
         q_outputs = self.q_encoder(**q_inputs)
 
         p_outputs = p_outputs.view(
-            self.config.data.batch_size, self.config.data.num_neg + 1, -1
+            self.config.data.batch_size,
+            self.config.data.num_neg + 1,
+            -1,
+            p_outputs.size()[-1],
         )
+        mean_p_outputs = torch.sum(p_outputs, dim=-2) / overflow_size.unsqueeze(-1)
         q_outputs = q_outputs.view(self.config.data.batch_size, 1, -1)
 
-        similarity_scores = torch.bmm(q_outputs, p_outputs.transpose(-2, -1)).squeeze()
+        similarity_scores = torch.bmm(
+            q_outputs, mean_p_outputs.transpose(-2, -1)
+        ).squeeze()
         similarity_scores = F.log_softmax(similarity_scores, dim=-1)
 
         self.validation_step_outputs["sim_score"].extend(similarity_scores.cpu())
@@ -558,45 +623,187 @@ class DenseRetrieval(pl.LightningModule):
                 self.log(k, v)
         self.validation_step_outputs = {"sim_score": [], "targets": []}
 
-    def create_embedding_vector(self):
+    def create_contexts_emb_vec(self):
+        # 1. 문서 데이터 로드
+        parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        context_data_path = f"{parent_directory}/{self.config.data.context_path}"
+
+        with open(context_data_path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+
+        text_key_pair = {v["text"]: k for k, v in data.items()}
+        for idx, (text, k) in enumerate(text_key_pair.items()):
+            self.titles.append(data[k]["title"])
+            self.contexts.append(text)
+            self.contexts_key_idx_pair[k] = idx
+
+        # 2. 문서 데이터 임베딩
         self.p_encoder.eval()
-        dataset_list = get_dataset_list(self.config.data.dataset_name)
+        self.p_encoder = self.p_encoder.to(self.config.device)
+        contexts_emb = []
 
-        eval_dataset = concatenate_datasets(
-            [ds["validation"] for ds in dataset_list]
-        ).select(range(100))
-        self.eval_corpus = list(set([example["context"] for example in eval_dataset]))
-
-        p_embs = []
-        for p in self.eval_corpus:
-            p = self.tokenizer(
-                p,
-                padding="max_length",
-                truncation=True,
-                return_tensors="pt",
-                max_length=self.config.data.max_seq_length,
+        if self.config.data.use_overflow_token:
+            tokenized_contexts, overflow_size = (
+                self.preprocess_module.process_overflow_token(self.contexts)
             )
-            p_emb = self.p_encoder(**p)
-            p_embs.append(p_emb.squeeze())
+        else:
+            tokenized_contexts, overflow_size = (
+                self.preprocess_module.truncate_overflow_token(self.contexts)
+            )
+            self.config.data.overflow_limit = 1
 
-        self.dense_embedding_matrix = torch.stack(p_embs).T
+        offset = 30 * self.config.data.overflow_limit * self.config.data.batch_size
+        total_len = len(tokenized_contexts["input_ids"])
 
-    def search(self, query, k=1):
+        with torch.no_grad():
+            for i in tqdm(range(0, total_len // offset + 1)):
+                sub_tokenized_contexts = dict()
+                sub_tokenized_contexts["input_ids"] = (
+                    torch.tensor(
+                        tokenized_contexts["input_ids"][offset * i : offset * (i + 1)]
+                    )
+                    .view(-1, self.config.data.max_seq_length)
+                    .to(self.config.device)
+                    .long()
+                )
+                sub_tokenized_contexts["attention_mask"] = (
+                    torch.tensor(
+                        tokenized_contexts["attention_mask"][
+                            offset * i : offset * (i + 1)
+                        ]
+                    )
+                    .view(-1, self.config.data.max_seq_length)
+                    .to(self.config.device)
+                    .long()
+                )
+                sub_tokenized_contexts["token_type_ids"] = (
+                    torch.tensor(
+                        tokenized_contexts["token_type_ids"][
+                            offset * i : offset * (i + 1)
+                        ]
+                    )
+                    .view(-1, self.config.data.max_seq_length)
+                    .to(self.config.device)
+                    .long()
+                )
+                sub_overflow_size = torch.tensor(
+                    overflow_size[
+                        (offset // self.config.data.overflow_limit)
+                        * i : (offset // self.config.data.overflow_limit)
+                        * (i + 1)
+                    ]
+                ).to(self.config.device)
+                context_emb = self.p_encoder(**sub_tokenized_contexts)
+                mean_context_emb = torch.sum(
+                    context_emb.view(
+                        -1, self.config.data.overflow_limit, context_emb.size()[-1]
+                    ),
+                    dim=-2,
+                ) / sub_overflow_size.unsqueeze(-1)
+                contexts_emb.append(mean_context_emb)
+
+            self.dense_emb_matrix = torch.cat(contexts_emb).T
+            print(f"dense embedding matrix shape: {self.dense_emb_matrix.size()}")
+
+    def search(self, query, k=1, return_sim_score=False):
         self.q_encoder.eval()
+        self.q_encoder = self.q_encoder.to(self.config.device)
 
-        query_token = self.tokenizer(
+        tokenized_query = self.preprocess_module.tokenizer(
             [query],
             padding="max_length",
             truncation=True,
             return_tensors="pt",
             max_length=self.config.data.max_seq_length,
         )
-        query_vector = self.q_encoder(**query_token)
+        with torch.no_grad():
+            query_vector = self.q_encoder(**tokenized_query.to(self.config.device))
 
-        similarity_score = torch.matmul(
-            query_vector, self.dense_embedding_matrix
-        ).squeeze()
+        similarity_score = torch.matmul(query_vector, self.dense_emb_matrix).squeeze()
         sorted_idx = torch.argsort(similarity_score, dim=-1, descending=True).squeeze()
         doc_scores = similarity_score[sorted_idx]
 
-        return doc_scores[:k], self.eval_corpus[sorted_idx[:k]]
+        if return_sim_score:
+            return (
+                doc_scores[:k].cpu(),
+                sorted_idx[:k].cpu(),
+                [self.contexts[idx] for idx in sorted_idx[:k]],
+                [self.titles[idx] for idx in sorted_idx[:k]],
+                similarity_score.cpu(),
+            )
+
+        return (
+            doc_scores[:k].cpu(),
+            sorted_idx[:k].cpu(),
+            [self.contexts[idx] for idx in sorted_idx[:k]],
+            [self.titles[idx] for idx in sorted_idx[:k]],
+        )
+
+
+def create_and_save_bi_encoder_emb_matrix(checkpoint_path):
+    retrieval = BiEncoderDenseRetrieval.load_from_checkpoint(checkpoint_path)
+    retrieval.create_contexts_emb_vec()
+
+    trainer = pl.Trainer()
+    trainer.strategy.connect(retrieval)
+    trainer.save_checkpoint(checkpoint_path.replace(".ckpt", "_emb-vec.ckpt"))
+
+
+class RetrievalReranker:
+
+    def __init__(self, sparse_retrieval, dense_retrieval):
+        self.sparse_retrieval = sparse_retrieval
+        self.dense_retrieval = dense_retrieval
+        self.sparse_retrieval_contexts_idx_key_pair = {
+            v: k for k, v in self.sparse_retrieval.contexts_key_idx_pair.items()
+        }
+        self.dense_retrieval_contexts_key_idx_pair = (
+            self.dense_retrieval.contexts_key_idx_pair
+        )
+
+    def search(self, question, rerank_k=100, final_k=10):
+        docs_score, docs_idx, docs, titles = self.sparse_retrieval.search(
+            question, k=rerank_k
+        )
+        docs_key = [
+            self.sparse_retrieval_contexts_idx_key_pair[doc_idx]
+            for doc_idx in docs_idx[0]
+        ]
+        sparse_docs_key_score_pair = {
+            doc_key: doc_score for doc_key, doc_score in zip(docs_key, docs_score[0])
+        }
+        key_doc_pair = {
+            doc_key: (doc, title)
+            for doc_key, doc, title in zip(docs_key, docs[0], titles[0])
+        }
+        sparse_doc_score_max = np.max(docs_score)
+
+        dense_retrieval_docs_idx = [
+            self.dense_retrieval_contexts_key_idx_pair[key] for key in docs_key
+        ]
+        _, _, _, _, sim_score = self.dense_retrieval.search(
+            question, k=rerank_k, return_sim_score=True
+        )
+        dense_docs_key_score_pair = {
+            doc_key: doc_score
+            for doc_key, doc_score in zip(docs_key, sim_score[dense_retrieval_docs_idx])
+        }
+        dense_doc_score_max = np.max(sim_score[dense_retrieval_docs_idx].numpy())
+
+        final_docs_key_score_pair = {
+            doc_key: 0.5 * (sparse_docs_key_score_pair[doc_key] / sparse_doc_score_max)
+            + 0.5 * (dense_docs_key_score_pair[doc_key] / dense_doc_score_max)
+            for doc_key in docs_key
+        }
+        final_docs_key_score_pair = sorted(
+            final_docs_key_score_pair.items(), key=lambda item: -item[1]
+        )[:final_k]
+
+        final_docs_score, final_docs_idx, final_docs, final_titles = [], [], [], []
+        for doc_key, score in final_docs_key_score_pair:
+            final_docs_score.append(score)
+            final_docs_idx.append(self.dense_retrieval_contexts_key_idx_pair[doc_key])
+            final_docs.append(key_doc_pair[doc_key][0])
+            final_titles.append(key_doc_pair[doc_key][1])
+
+        return final_docs_score, final_docs_idx, final_docs, final_titles

@@ -12,7 +12,7 @@ data:
   remove_columns: [token_type_ids] #token_type_ids
   augmentation: [] # modify_question, add_modified_question
 model:
-  plm_name: klue/roberta-large
+  plm_name: klue/roberta-base
 
 metric: [squad, bleu] #squad, bleu
 

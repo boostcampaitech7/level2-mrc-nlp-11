@@ -1,48 +1,49 @@
-data:
-  data_module: RetrievalDataModule
-  dataset_name: [default] #default, klue_mrc, squad_kor_v1
-  preprocessing_num_workers: 1
-  max_seq_length: 512
-  doc_stride: 64
-  batch_size: 4
-  num_neg: 2
-  overflow_limit: 3
-
-model:
-  plm_name: klue/bert-base
-  encoder: BertEncoder
-
-loss: nll_loss
-
-metric: [accuracy, f1] #accuracy, f1
-
-optimizer:
-  name: AdamW
-  lr: 2e-5
-
-train:
-  output_dir: "outputs"
-  num_train_epochs: 3
-
-wandb:
-  enable: true
-  project: ${oc.env:PROJECT_NAME}
-
-device: mps
-
+bi:
+  data:
+    data_module: BiEncoderRetrievalDataModule
+    dataset_name: [sparse_retrieval_neg_sampling]
+    context_path: data/wikipedia_documents.json
+    preprocessing_num_workers: 1
+    max_seq_length: 512
+    doc_stride: 64
+    batch_size: 4
+    neg_sampling_method: sparse_neg_sampling #sparse_neg_sampling, random_neg_sampling
+    num_neg: 3
+    use_overflow_token: true
+    overflow_limit: 3
+  model:
+    plm_name: klue/roberta-base
+    encoder: RobertaEncoder
+    use_single_model: true
+    use_lora: false
+  loss: nll_loss
+  metric: [accuracy]
+  optimizer:
+    name: Adam
+    lr: 2e-5
+  train:
+    output_dir: "outputs"
+    num_train_epochs: 10
+  wandb:
+    enable: true
+    project: ${oc.env:PROJECT_NAME}
+  device: cuda
 
 tfidf:
   data_path: data/wikipedia_documents.json
   tokenizer_name: klue/bert-base
   ngram: [1, 1]
+  add_title: false
 
 bm25:
   subword:
     tokenizer_name: klue/bert-base
     data_path: data/wikipedia_documents.json
     model: BM25Okapi
+    add_title: false
   morphs:
     analyzer_name: Kkma #currently only Kkma is available
     data_path: data/wikipedia_documents_kkma_filtered.json
     model: BM25Okapi
     tokenized_column: filtered_pos_text
+    add_title: false
