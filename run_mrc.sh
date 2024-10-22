@@ -12,8 +12,8 @@ fi
 SWEEP_CONFIG="./config/mrc_sweep.yaml"
 COUNT=4
 
-use_sweep=true
-
+use_sweep=false
+huggingface-cli login --token ${HUGGINGFACE_TOKEN}
 # 1. Check huggingface-cli login status
 login_status=$(huggingface-cli whoami)
 
@@ -30,6 +30,7 @@ fi
 # 2. install requirements
 # pip3 install -r requirements.txt
 
+wandb login --relogin ${WANDB_TOKEN}
 # 3. train model (by wandb sweep or wandb run)
 if [[ "${use_sweep}" = true ]]; then
     SWEEP_OUTPUT=$(wandb sweep -p ${PROJECT_NAME} ${SWEEP_CONFIG} 2>&1)
