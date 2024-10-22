@@ -3,11 +3,24 @@ import aiohttp
 import json
 import re
 from tqdm import tqdm
+import os
+from dotenv import load_dotenv
+from ratelimit import limits, sleep_and_retry
+
+# .env 파일 로드
+load_dotenv()
 
 
+# 분당 최대 요청 횟수 (예: 60회)
+REQUESTS_PER_MINUTE = 60
+
+
+# 요청 간 레이트 리미트 설정
+@sleep_and_retry
+@limits(calls=REQUESTS_PER_MINUTE, period=60)
 async def call_openai_API(data, batch_size, prompt_content, response_format):
     # 1. OpenAI API 키 설정
-    OPENAI_API_KEY = ""
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     async_request_number = 10
 
     # 3. 배치 분할 함수
@@ -25,10 +38,10 @@ async def call_openai_API(data, batch_size, prompt_content, response_format):
             prompt = f"""
                 {prompt_content}
 
-                문서 목록:
+                ## 문서 목록:
                 {docs}
 
-                응답 형식:
+                ## 응답 형식:
                 {response_format}
                 """
             headers = {
@@ -36,11 +49,11 @@ async def call_openai_API(data, batch_size, prompt_content, response_format):
                 "Authorization": f"Bearer {OPENAI_API_KEY}",
             }
             data = {
-                "model": "gpt-4o-mini",  # 더 빠른 모델 사용
+                "model": "gpt-4o-mini-2024-07-18",  # 더 빠른 모델 사용
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are an assistant that preprocesses texts with removing wikipedia annotation representations.",
+                        "content": "You are an assistant that that generates new questions and answers from wikipedia documents.",
                     },
                     {"role": "user", "content": prompt},
                 ],
