@@ -91,3 +91,19 @@ def view_predictions(example, nbest_prediction):
                 unsafe_allow_html=True,
             )
             st.markdown("<hr style='margin-'>", unsafe_allow_html=True)
+
+
+def view_documents(documents):
+    col1, col2 = st.columns(2)
+
+    with col1:
+        for i in range(0, len(documents), 2):
+            document = documents[i]
+            with st.expander(f'{document["document_id"]}: {document["title"]}'):
+                st.markdown(document["text"])
+
+    with col2:
+        for i in range(1, len(documents), 2):
+            document = documents[i]
+            with st.expander(f'{document["document_id"]}: {document["title"]}'):
+                st.markdown(document["text"])

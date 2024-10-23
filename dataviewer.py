@@ -6,7 +6,12 @@ import hydra
 from module.data import *
 import os
 from dotenv import load_dotenv
-from utils.dataviewer_tabs import view_train_data, view_validation_data, view_test_data
+from utils.dataviewer_tabs import (
+    view_train_data,
+    view_validation_data,
+    view_test_data,
+    view_wiki,
+)
 from utils.analysis_retrieval import (
     DenseRetrievalResultViewer,
     SparseRetrievalResultViewer,
@@ -26,29 +31,30 @@ def load_wiki():
     return wiki
 
 
-def main():
+@hydra.main(config_path="./config", config_name="streamlit_mrc", version_base=None)
+def main(config):
     # 화면 레이아웃 설정
     st.set_page_config(layout="wide", page_title="SEVEN ELEVEN ODQA Data Viewer V2.0.0")
 
-    pg = st.navigation(
-        [
-            st.Page(data_page, title="Data Page", icon="🤗"),
-            st.Page(
-                retrieval_analysis_page, title="Retrieval Analysis Page", icon="🤔"
-            ),
-        ]
-    )
-    pg.run()
-
-
-@hydra.main(config_path="./config", config_name="streamlit_mrc", version_base=None)
-def data_page(config):
     # 우선 default 데이터셋만 볼 수 있게 함
-    mrc_config = config.mrc
+    config.mrc.data.dataset_name = ["default"]
+    data_module = MrcDataModule(config.mrc)
+
+    st.sidebar.title("페이지 선택")
+
+    page = st.sidebar.selectbox(
+        "Choose a page", ("Data Page", "Retrieval Analysis Page")
+    )
+
+    if page == "Data Page":
+        data_page(config, data_module)
+
+    elif page == "Retrieval Analysis Page":
+        retrieval_analysis_page(config.streamlit)
+
+
+def data_page(config, data_module):
     streamlit_config = config.streamlit
-    mrc_config.data.dataset_name = ["default"]
-    data_module = MrcDataModule(mrc_config)
-    data_module.setup()
 
     train_tab, validation_tab, test_tab, wiki_tab = st.tabs(
         ["Train", "Validation", "Test", "Wiki"]
@@ -64,23 +70,28 @@ def data_page(config):
         view_test_data(data_module, streamlit_config)
 
     with wiki_tab:
-        # view_wiki_data()
-        pass
+        view_wiki()
 
 
-@hydra.main(config_path="./config", config_name="streamlit", version_base=None)
 def retrieval_analysis_page(config):
     tab1, tab2 = st.tabs(["문서 검색 결과 살펴보기", "문서 검색 결과 비교하기"])
-    result_path = os.getenv("DIR_PATH") + "/level2-mrc-nlp-11" + config.retrieval.path
+    dense_path = os.getenv("DIR_PATH") + "/level2-mrc-nlp-11" + config.retrieval.dense
+    sparse_path = os.getenv("DIR_PATH") + "/level2-mrc-nlp-11" + config.retrieval.sparse
 
-    if not os.path.isfile(result_path):
+    if not os.path.isfile(sparse_path):
         st.error("Retriever 비교를 위한 결과 파일이 없습니다.", icon="⚠️")
         return
 
     if config.retrieval.mode == "dense":
-        result_viewer = DenseRetrievalResultViewer(result_path)
+        if not os.path.isfile(dense_path):
+            st.error("Retriever 비교를 위한 결과 파일이 없습니다.", icon="⚠️")
+            return
+        result_viewer = DenseRetrievalResultViewer(dense_path)
     elif config.retrieval.mode == "sparse":
-        result_viewer = SparseRetrievalResultViewer(result_path)
+        if not os.path.isfile(sparse_path):
+            st.error("Retriever 비교를 위한 결과 파일이 없습니다.", icon="⚠️")
+            return
+        result_viewer = SparseRetrievalResultViewer(sparse_path)
 
     result_method1 = result_viewer.result_method1
     result_method2 = result_viewer.result_method2
