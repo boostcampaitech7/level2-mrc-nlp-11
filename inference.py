@@ -59,9 +59,7 @@ def main(
             else:
                 # 2.2. use rerank
                 docs_score, docs_idx, docs, titles = [], [], [], []
-                for question, context in zip(
-                    eval_examples["question"], eval_examples["context"]
-                ):
+                for question in eval_examples["question"]:
                     score, idx, doc, title = retrieval.search(question)
                     docs_score.append(score)
                     docs_idx.append(idx)
@@ -140,14 +138,12 @@ def main(
         if not dense_retrieval_checkpoint:
             # 2.1. not use rerank
             docs_score, docs_idx, docs, titles = retrieval.search(
-                eval_examples["question"], k=top_k
+                test_examples["question"], k=top_k
             )
         else:
             # 2.2. use rerank
             docs_score, docs_idx, docs, titles = [], [], [], []
-            for question, context in zip(
-                eval_examples["question"], eval_examples["context"]
-            ):
+            for question in test_examples["question"]:
                 score, idx, doc, title = retrieval.search(question)
                 docs_score.append(score)
                 docs_idx.append(idx)
@@ -187,7 +183,7 @@ def main(
         if not run_mrc:
             return
 
-        # 4. make eval_dataset & eval_dataloader
+        # 4. make test_dataset & test_dataloader
         data_module = MrcDataModule(config)
         data_module.test_dataset, preproc_test_examples = data_module.get_dataset(
             test_examples

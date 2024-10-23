@@ -411,7 +411,7 @@ class BiEncoderRetrievalPreprocDataModule:
             max_length=self.config.data.max_seq_length,
             padding="max_length",
         )
-        overflow_size = [1] * len(truncate_tokenized_p_with_neg)
+        overflow_size = [1] * len(p_with_neg)
 
         return truncate_tokenized_p_with_neg, overflow_size
 

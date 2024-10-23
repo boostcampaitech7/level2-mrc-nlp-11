@@ -648,7 +648,7 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
             )
         else:
             tokenized_contexts, overflow_size = (
-                self.preprocess_module.truncate_overflow_token(self.contexts)
+                self.preprocess_module.cut_overflow_token(self.contexts)
             )
             self.config.data.overflow_limit = 1
 
@@ -741,7 +741,9 @@ class BiEncoderDenseRetrieval(pl.LightningModule):
 
 
 def create_and_save_bi_encoder_emb_matrix(checkpoint_path):
-    retrieval = BiEncoderDenseRetrieval.load_from_checkpoint(checkpoint_path)
+    retrieval = BiEncoderDenseRetrieval.load_from_checkpoint(
+        checkpoint_path, strict=False
+    )
     retrieval.create_contexts_emb_vec()
 
     trainer = pl.Trainer()

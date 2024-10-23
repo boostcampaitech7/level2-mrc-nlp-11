@@ -1,14 +1,14 @@
 data:
   data_module: MrcDataModule
-  dataset_name: [aug_prev_filtered] #default, squad_kor_v1_filtered, etri_mrc_filtered, aug_new_filtered, paraphrased_filtered, aug_prev
+  dataset_name: [aug_new] # default, klue_mrc, squad_kor_v1, aug_new
   preprocessing_num_workers: 1
   max_seq_length: 384
   max_answer_length: 30
   doc_stride: 128
   batch_size: 16
   n_best_size: 5
-  preproc_list: [title_context_merge_token] # title_context_merge_token
-  add_special_token: [<TITLE>, <TITLE_END>] # <TITLE>, <TITLE_END>
+  preproc_list: [original] # title_context_merge_token
+  add_special_token: [] # <TITLE>, <TITLE_END>
   remove_columns: [token_type_ids] #token_type_ids
 model:
   plm_name: uomnf97/klue-roberta-finetuned-korquad-v2
@@ -21,7 +21,7 @@ optimizer:
 
 train:
   output_dir: "outputs"
-  num_train_epochs: 25
+  num_train_epochs: 3
 
 wandb:
   enable: true

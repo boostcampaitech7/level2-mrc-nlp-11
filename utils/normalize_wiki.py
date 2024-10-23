@@ -414,7 +414,7 @@ def main():
     # save
     normalized_wikipedia_documents_path = (
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        + "/data/normalized_wikipedia_documents.json"
+        + "/data/wikipedia_documents.json"
     )
     with open(normalized_wikipedia_documents_path, "w", encoding="utf-8") as writer:
         writer.write(json.dumps(wiki_documents, indent=4, ensure_ascii=False) + "\n")
