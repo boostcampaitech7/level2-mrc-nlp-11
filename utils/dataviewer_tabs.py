@@ -28,9 +28,13 @@ def load_examples(mode):
 
 @st.cache_data
 def load_predictions(prediction_path):
-    with open(prediction_path, "r", encoding="utf-8") as f:
-        nbest_predictions = json.load(f)
-    return nbest_predictions
+    if os.path.isfile(prediction_path):
+        with open(prediction_path, "r", encoding="utf-8") as f:
+            nbest_predictions = json.load(f)
+        return nbest_predictions
+    else:
+        st.toast("⚠️nbest_prediction 파일이 없습니다.")
+        return None
 
 
 @st.cache_data
@@ -69,12 +73,50 @@ def view_validation_data(data_module, config):
         os.getenv("DIR_PATH") + "/level2-mrc-nlp-11" + config.prediction.validation
     )
     validation_examples = load_examples("validation")
-    select_options = [
-        f'{example["id"]}: {example["question"]}' for example in validation_examples
-    ]
+
+    example_id_to_idx = {
+        validation_examples[i]["id"]: i for i in range(len(validation_examples))
+    }
+
+    if nbest_predictions:
+        category = st.radio(
+            "분류 선택",
+            ["전체 보기", "맞은 질문만 보기", "틀린 질문만 보기"],
+            horizontal=True,
+            label_visibility="collapsed",
+        )
+        if category == "전체 보기":
+            select_options = [
+                f'{example["id"]}: {example["question"]}'
+                for example in validation_examples
+            ]
+        elif category == "맞은 질문만 보기":
+            select_options = []
+            for example in validation_examples:
+                if (
+                    example["answers"]["text"][0]
+                    == nbest_predictions[example["id"]][0]["text"]
+                ):
+                    select_options.append(f'{example["id"]}: {example["question"]}')
+        else:
+            select_options = []
+            for example in validation_examples:
+                if (
+                    example["answers"]["text"][0]
+                    != nbest_predictions[example["id"]][0]["text"]
+                ):
+                    select_options.append(f'{example["id"]}: {example["question"]}')
+
+    else:
+        select_options = [
+            f'{example["id"]}: {example["question"]}' for example in validation_examples
+        ]
+
     selected_question = st.selectbox("질문을 선택하세요", select_options)
 
-    selected_example = validation_examples[select_options.index(selected_question)]
+    selected_example = validation_examples[
+        example_id_to_idx[selected_question.split(":")[0]]
+    ]
 
     answer_column, prediction_column = st.columns(2, gap="medium")
 
