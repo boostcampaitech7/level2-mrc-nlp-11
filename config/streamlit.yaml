@@ -5,4 +5,4 @@ prediction:  # prediction은 nbest파일 경로를 넣어 주세요!
 retrieval:
   dense: /data/retrieval_compare/BiEncoderDenseRetrieval-BiEncoderDenseRetrieval-compare-result.json
   sparse: /data/retrieval_compare/SubwordBm25Retrieval-TfIdfRetrieval-compare-result.json
-  mode: dense
+  mode: sparse
