@@ -1,6 +1,6 @@
 data:
   data_module: MrcDataModule
-  dataset_name: [default] #default, klue_mrc, squad_kor_v1
+  dataset_name: [aug_new] # default, klue_mrc, squad_kor_v1, aug_new
   preprocessing_num_workers: 1
   max_seq_length: 384
   max_answer_length: 30
@@ -17,11 +17,11 @@ metric: [squad, bleu] #squad, bleu
 
 optimizer:
   name: AdamW
-  lr: 1.6764783497920226e-05
+  lr: 1.7110631470130408e-05
 
 train:
   output_dir: "outputs"
-  num_train_epochs: 10
+  num_train_epochs: 3
 
 wandb:
   enable: true
