@@ -1,0 +1,3 @@
+defaults:
+  - mrc@mrc
+  - streamlit@streamlit
