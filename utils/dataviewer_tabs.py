@@ -36,7 +36,8 @@ def load_predictions(prediction_path):
 @st.cache_data
 def load_wiki():
     wiki_path = (
-        os.getenv("DIR_PATH") + "/level2-mrc-nlp-11/data/wikipedia_documents.json"
+        os.getenv("DIR_PATH")
+        + "/level2-mrc-nlp-11/data/normalized_wikipedia_documents.json"
     )
     with open(wiki_path, "r", encoding="utf-8") as f:
         wiki = json.load(f)
@@ -57,10 +58,10 @@ def view_train_data(data_module, config):
     answer_column, prediction_column = st.columns(2, gap="medium")
 
     with answer_column:
-        view_answer(selected_example)
+        view_answer(data_module, selected_example)
 
     with prediction_column:
-        view_predictions(selected_example, None)
+        view_predictions(data_module, selected_example, None)
 
 
 def view_validation_data(data_module, config):
@@ -78,11 +79,11 @@ def view_validation_data(data_module, config):
     answer_column, prediction_column = st.columns(2, gap="medium")
 
     with answer_column:
-        view_answer(selected_example)
+        view_answer(data_module, selected_example)
 
     with prediction_column:
         selected_nbest_prediction = nbest_predictions[selected_example["id"]]
-        view_predictions(selected_example, selected_nbest_prediction)
+        view_predictions(data_module, selected_example, selected_nbest_prediction)
 
 
 def view_test_data(data_module, config):
@@ -101,11 +102,11 @@ def view_test_data(data_module, config):
     answer_column, prediction_column = st.columns(2, gap="medium")
 
     with answer_column:
-        view_answer(selected_example)
+        view_answer(data_module, selected_example)
 
     with prediction_column:
         selected_nbest_prediction = nbest_predictions[selected_example["id"]]
-        view_predictions(selected_example, selected_nbest_prediction)
+        view_predictions(data_module, selected_example, selected_nbest_prediction)
 
 
 def view_wiki():

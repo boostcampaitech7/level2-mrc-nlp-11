@@ -1,8 +1,10 @@
 import streamlit as st
+from datasets import Dataset
+import copy
 
 
-def view_answer(example):
-    st.subheader("정답", divider="gray")
+def view_answer(data_module, example):
+    st.header("정답", divider="blue")
 
     if "answers" in example:
         context = example["context"]
@@ -23,12 +25,15 @@ def view_answer(example):
                     """,
             unsafe_allow_html=True,
         )
+
+        st.subheader("Wanna see tokenized example?", divider="gray")
+        view_tokenized_example(data_module, example, f"answer-{example['id']}")
     else:
         st.write("정답이 공개되지 않은 테스트 데이터입니다.")
 
 
-def view_predictions(example, nbest_prediction):
-    st.subheader("예측", divider="gray")
+def view_predictions(data_module, example, nbest_prediction):
+    st.header("예측", divider="blue")
 
     if nbest_prediction is None:
         st.write("예측을 하지 않는 학습 데이터입니다.")
@@ -61,6 +66,11 @@ def view_predictions(example, nbest_prediction):
         unsafe_allow_html=True,
     )
 
+    example_for_tokenize = copy.deepcopy(example)
+    example_for_tokenize["context"] = prediction["context"]
+    st.subheader("Wanna see tokenized example?", divider="gray")
+    view_tokenized_example(data_module, example_for_tokenize, f"pred-{example['id']}")
+
     with st.expander("nbest prediction 보기"):
         for i in range(1, len(nbest_prediction)):
             prediction = nbest_prediction[i]
@@ -90,7 +100,12 @@ def view_predictions(example, nbest_prediction):
                         """,
                 unsafe_allow_html=True,
             )
-            st.markdown("<hr style='margin-'>", unsafe_allow_html=True)
+            example_for_tokenize = copy.deepcopy(example)
+            example_for_tokenize["context"] = prediction["context"]
+            view_tokenized_example(
+                data_module, example_for_tokenize, f"nbest{i}-{example['id']}"
+            )
+            st.markdown("<hr>", unsafe_allow_html=True)
 
 
 def view_documents(documents):
@@ -107,3 +122,46 @@ def view_documents(documents):
             document = documents[i]
             with st.expander(f'{document["document_id"]}: {document["title"]}'):
                 st.markdown(document["text"])
+
+
+def view_tokenized_example(data_module, example, key):
+    tokenize_button = st.button("Tokenize🤖", key=key)
+
+    if tokenize_button:
+        examples = Dataset.from_list([example])
+        data = data_module.get_dataset(
+            examples, data_module.prepare_validation_features
+        )
+        tokenized_examples = []
+        for i in range(len(data[0]["input_ids"])):
+            # Tokenizing
+            tokenized_examples.append(
+                data_module.tokenizer.convert_ids_to_tokens(data[0]["input_ids"][i])
+            )
+
+        for tokenized_example in tokenized_examples:
+            colored_tokens = []
+            for token in tokenized_example:
+                # 스페셜 토큰 처리
+                if token in ["[SEP]", "[CLS]"]:
+                    colored_tokens.append(
+                        f"<div style='display:inline-block; font-size:14px; background-color:#c5cff6; border:1px solid #ddd; border-radius:5px; padding:1px 5px; margin:2px;'>{token}</div>"
+                    )
+                # 패드 토큰
+                elif token == "[PAD]":
+                    colored_tokens.append(
+                        f"<div style='display:inline-block; font-size:14px; color: #ddd; border:1px solid #ddd; border-radius:5px; padding:1px 5px; margin:2px;'>{token}</div>"
+                    )
+                else:
+                    colored_tokens.append(
+                        f"<div style='display:inline-block; font-size:14px; border:1px solid #ddd; border-radius:5px; padding:1px 5px; margin:2px;'>{token}</div>"
+                    )
+
+            st.markdown(
+                f"""
+                        <div style='background-color: #f7f7ff; border-radius: 10px; padding: 20px; margin-bottom: 20px;'>
+                        {" ".join(colored_tokens)}
+                        </div>
+                        """,
+                unsafe_allow_html=True,
+            )
