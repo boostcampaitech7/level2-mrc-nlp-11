@@ -1,30 +1,34 @@
 data:
   data_module: MrcDataModule
-  dataset_name: [default] #default, klue_mrc, squad_kor_v1
+  dataset_name: [aug_prev_filtered] #default, squad_kor_v1_filtered, etri_mrc_filtered, aug_new_filtered, paraphrased_filtered, aug_prev
   preprocessing_num_workers: 1
   max_seq_length: 384
   max_answer_length: 30
   doc_stride: 128
   batch_size: 16
   n_best_size: 5
-  preproc_list: [original] # title_context_merge_token
-  add_special_token: [] # <TITLE>, <TITLE_END>
+  preproc_list: [title_context_merge_token] # title_context_merge_token
+  add_special_token: [<TITLE>, <TITLE_END>] # <TITLE>, <TITLE_END>
   remove_columns: [token_type_ids] #token_type_ids
 model:
-  plm_name: klue/roberta-base
+  plm_name: uomnf97/klue-roberta-finetuned-korquad-v2
 
 metric: [squad, bleu] #squad, bleu
 
 optimizer:
   name: AdamW
-  lr: 1.6764783497920226e-05
+  lr: 1.7110631470130408e-05
 
 train:
   output_dir: "outputs"
-  num_train_epochs: 10
+  num_train_epochs: 25
 
 wandb:
   enable: true
   project: ${oc.env:PROJECT_NAME}
 
 device: cuda
+
+checkpoint_path:
+
+use_lora: False

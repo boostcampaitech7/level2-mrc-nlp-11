@@ -1,14 +1,20 @@
+# 표준 라이브러리
 import collections, json, logging, os
 from typing import Optional, Tuple
-from tqdm.auto import tqdm
+
+# 서드파티 라이브러리
 import numpy as np
 import torch
 import pytorch_lightning as pl
-from transformers import AutoModelForQuestionAnswering, EvalPrediction
+from tqdm.auto import tqdm
+from transformers import AutoModelForQuestionAnswering, EvalPrediction, AutoTokenizer
 from evaluate import load
+from peft import LoraConfig, get_peft_model
+from konlpy.tag import Kkma
+
+# 로컬 모듈
 from utils.common import init_obj
 import module.metric as module_metric
-from konlpy.tag import Kkma
 
 
 logger = logging.getLogger(__name__)
@@ -28,15 +34,21 @@ class MrcLightningModule(pl.LightningModule):
         self.kkma = Kkma()
         self.save_hyperparameters()
         self.config = config
+
+        self.tokenizer = AutoTokenizer.from_pretrained(self.config.model.plm_name)
+        tokens = list(self.config.data.add_special_token)
+        tokens = [str(t) for t in tokens]
+        special_tokens_dict = {"additional_special_tokens": tokens}
+        num_added_tokens = self.tokenizer.add_special_tokens(special_tokens_dict)
+
         self.model = AutoModelForQuestionAnswering.from_pretrained(
             self.config.model.plm_name
         )
-        # model의 임베딩 크기 수정
-        if len(self.config.data.add_special_token) != 0:
-            self.model.resize_token_embeddings(
-                self.model.config.vocab_size + len(self.config.data.add_special_token)
-            )
-
+        self.model.resize_token_embeddings(len(self.tokenizer))
+        self.model.config.vocab_size = len(self.tokenizer)
+        # Apply LoRA if necessary
+        # if self.config.use_lora:
+        #     self.apply_lora()
         self.eval_dataset = eval_dataset
         self.test_dataset = test_dataset
         self.eval_examples = eval_examples
@@ -47,6 +59,22 @@ class MrcLightningModule(pl.LightningModule):
             for metric in self.config.metric
         }
         self.inference_mode = inference_mode
+
+    def apply_lora(self):
+        if self.config.use_lora:
+            lora_config = LoraConfig(
+                r=16,
+                lora_alpha=32,
+                target_modules=["query", "key"],
+                lora_dropout=0.2,
+                bias="none",
+            )
+            self.model = get_peft_model(self.model, lora_config)
+            for param in self.model.base_model.parameters():
+                param.requires_grad = False
+            for n, p in self.model.named_parameters():
+                if "lora_" in n:
+                    p.requires_grad = True
 
     def on_save_checkpoint(self, checkpoint):
         del checkpoint["hyper_parameters"]["eval_dataset"]
@@ -60,10 +88,27 @@ class MrcLightningModule(pl.LightningModule):
         self.eval_examples = None
         self.test_examples = None
 
+        # Extract the vocab size from the embedding weights in the checkpoint
+        embedding_weight = checkpoint["state_dict"][
+            "model.roberta.embeddings.word_embeddings.weight"
+        ]
+        vocab_size_in_checkpoint = embedding_weight.size(0)
+
+        # Resize the model's embeddings
+        self.model.resize_token_embeddings(vocab_size_in_checkpoint)
+        self.model.config.vocab_size = vocab_size_in_checkpoint
+
     def configure_optimizers(self):
-        trainable_params = list(
-            filter(lambda p: p.requires_grad, self.model.parameters())
-        )
+        if self.config.use_lora:
+            # Filter parameters that are LoRA parameters
+            trainable_params = [
+                p
+                for n, p in self.model.named_parameters()
+                if p.requires_grad and "lora_" in n
+            ]
+        else:
+            # Train all parameters that require grad
+            trainable_params = [p for p in self.model.parameters() if p.requires_grad]
 
         optimizer_name = self.config.optimizer.name
         del self.config.optimizer.name
@@ -422,8 +467,10 @@ class MrcLightningModule(pl.LightningModule):
             parent_directory = os.path.dirname(
                 os.path.dirname(os.path.abspath(__file__))
             )
-
-            run_name = f"{self.config.data.preproc_list[0]}_{self.config.data.dataset_name[0]}_bz={self.config.data.batch_size}_lr={self.config.optimizer.lr}"
+            dataset_name = ""
+            for name in self.config.data.dataset_name:
+                dataset_name += name + "_"
+            run_name = f"lora_{self.config.use_lora}_{self.config.data.preproc_list[0]}_{dataset_name}bz={self.config.data.batch_size}_lr={self.config.optimizer.lr}"
 
             prediction_file = os.path.join(
                 parent_directory,
@@ -711,8 +758,10 @@ class MrcLightningModule(pl.LightningModule):
             parent_directory = os.path.dirname(
                 os.path.dirname(os.path.abspath(__file__))
             )
-
-            run_name = f"{self.config.data.preproc_list[0]}_{self.config.data.dataset_name[0]}_bz={self.config.data.batch_size}_lr={self.config.optimizer.lr}"
+            dataset_name = ""
+            for name in self.config.data.dataset_name:
+                dataset_name += name + "_"
+            run_name = f"lora_{self.config.use_lora}_{self.config.data.preproc_list[0]}_{dataset_name}bz={self.config.data.batch_size}_lr={self.config.optimizer.lr}"
 
             prediction_file = os.path.join(
                 parent_directory,
