@@ -2,9 +2,9 @@ import pandas as pd
 import ast
 from datasets import Dataset, Features, Sequence, Value
 
-input_file_path = "/AI-projects/ODQA-project/data/aug_prev/train/aug_prev_train_update_id.csv"
+input_file_path = "/data/ephemeral/home/level2-mrc-nlp-11/data/aug_prev/aug_prev_train.csv"
 output_file_path = (
-    "/AI-projects/ODQA-project/data/aug_prev/train"
+    "/data/ephemeral/home/level2-mrc-nlp-11/data/aug_prev/train"
 )
 # Step 1: Read the CSV file
 df = pd.read_csv(input_file_path)
