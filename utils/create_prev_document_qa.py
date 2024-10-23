@@ -218,12 +218,6 @@ def update_answer_start(df):
 
     return pd.DataFrame(filtered_data)
 
-
-    train = pd.read_csv(os.getenv('DIR_PATH') + "level2-mrc-nlp-11/data/aug_prev/aug_prev_train.csv")
-    valid = pd.read_csv(os.getenv('DIR_PATH') + "level2-mrc-nlp-11/data/aug_prev/aug_prev_valid.csv")
-
-    return train, valid
-
 # answer_start 값 업데이트 후 csv 파일로 저장하는 함수
 def process_answers_and_save():
     setup_logging('error_log.txt')
