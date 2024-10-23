@@ -799,7 +799,7 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
 class SparseRetrievalResultViewer(RetrievalResultViewer):
 
     def __init__(self, result_file_path):
-        super.__init__(result_file_path)
+        super().__init__(result_file_path)
 
     def simplify_data(self, _list, return_precent=False, return_total_value=True):
         if not isinstance(_list, list):
