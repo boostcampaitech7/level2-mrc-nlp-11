@@ -17,3 +17,4 @@ logs/
 inference_retrieval.py
 etc/
 test*.py
+outputs1/
