@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import pytorch_lightning as pl
 
 from module.data import *
-from module.mrc import *
+from module.mrc1 import *
 from module.retrieval import *
 from datasets import load_from_disk, Dataset
 
@@ -57,10 +57,14 @@ def main(
                     eval_examples["question"], k=top_k
                 )
             else:
+                rerank_k = 10 * top_k
+                final_k = top_k
                 # 2.2. use rerank
                 docs_score, docs_idx, docs, titles = [], [], [], []
                 for question in eval_examples["question"]:
-                    score, idx, doc, title = retrieval.search(question)
+                    score, idx, doc, title = retrieval.search(
+                        question, rerank_k=rerank_k, final_k=final_k
+                    )
                     docs_score.append(score)
                     docs_idx.append(idx)
                     docs.append(doc)
@@ -131,6 +135,7 @@ def main(
             get_dataset_list(["default"])
         test_examples = load_from_disk("./data/test_dataset/")["validation"]
 
+        """
         if not run_retrieval:
             return
 
@@ -142,13 +147,26 @@ def main(
             )
         else:
             # 2.2. use rerank
+            rerank_k=10 * top_k
+            final_k = top_k
             docs_score, docs_idx, docs, titles = [], [], [], []
             for question in test_examples["question"]:
-                score, idx, doc, title = retrieval.search(question)
+                score, idx, doc, title = retrieval.search(question, rerank_k=rerank_k, final_k=final_k)
                 docs_score.append(score)
                 docs_idx.append(idx)
                 docs.append(doc)
                 titles.append(title)
+        """
+        with open(
+            "/data/ephemeral/home/gj/level2-mrc-nlp-11/sparse-morphs_dense-ng=17=bz=4-ot=1.json",
+            "r",
+            encoding="utf-8",
+        ) as json_file:
+            data = json.load(json_file)
+        docs_score = data["docs_score"]
+        docs_idx = data["docs_idx"]
+        docs = data["docs"]
+        titles = data["titles"]
 
         if "title_context_merge_token" in config.data.preproc_list:
             docs = [
@@ -211,14 +229,14 @@ if __name__ == "__main__":
         + "/level2-mrc-nlp-11/retrieval_checkpoints/lora-bi-encoder=klue-roberta-base_use-overflow-token=True_num-neg=8_bz=4_lr=2e-05_epoch=14-accuracy=0.85_emb-vec.ckpt"
     )
     # mrc model checkpoint 경로 (없으면 None으로 설정하세요)
-    mrc_checkpoint = "/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/checkpoints/fine_tuned/klue-roberta-large_korquad1.0_filtered_classic-valley-65_original_default_bz=16_lr=1.6764783497920226e-05_fine_tuned_epoch=03_exact_match=71.67.ckpt"
+    mrc_checkpoint = "/data/ephemeral/home/sangyeop/level2-mrc-nlp-11/checkpoints/lora/lora_True_soft-forest-109_title_context_merge_token_default__bz=16_lr=1.7110631470130408e-05_fine_tuned_epoch=18_exact_match=73.33.ckpt"
 
     # main() 인자
-    mode = "validation"
-    top_k = 10
+    mode = "test"
+    top_k = 50
     run_mrc = True
-    run_retrieval = True
-    use_separate_inference = False  # Separate Inference 사용 시 True로 설정
+    run_retrieval = False
+    use_separate_inference = True  # Separate Inference 사용 시 True로 설정
 
     # 1. 체크포인트 디렉토리 경로 예시
     checkpoints_dir = (
@@ -243,3 +261,5 @@ if __name__ == "__main__":
         mode,
         use_separate_inference,
     )
+
+# combine

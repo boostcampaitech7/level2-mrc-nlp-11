@@ -44,6 +44,16 @@ class MrcLightningModule(pl.LightningModule):
         self.model = AutoModelForQuestionAnswering.from_pretrained(
             self.config.model.plm_name
         )
+        print(self.config.use_lora)
+        if self.config.use_lora:
+            lora_config = LoraConfig(
+                r=16,
+                lora_alpha=32,
+                target_modules=["query", "key"],
+                lora_dropout=0.2,
+                bias="none",
+            )
+        self.model = get_peft_model(self.model, lora_config)
         self.model.resize_token_embeddings(len(self.tokenizer))
         self.model.config.vocab_size = len(self.tokenizer)
         # Apply LoRA if necessary
@@ -87,14 +97,18 @@ class MrcLightningModule(pl.LightningModule):
         self.test_dataset = None
         self.eval_examples = None
         self.test_examples = None
-        state_dict = checkpoint["state_dict"]
+        """
+        state_dict = checkpoint['state_dict']
         # Extract the vocab size from the embedding weights in the checkpoint
-        embedding_weight = state_dict["model.roberta.embeddings.word_embeddings.weight"]
+        embedding_weight = checkpoint["state_dict"][
+            "model.roberta.embeddings.word_embeddings.weight"
+        ]
         vocab_size_in_checkpoint = embedding_weight.size(0)
 
         # Resize the model's embeddings
         self.model.resize_token_embeddings(vocab_size_in_checkpoint)
         self.model.config.vocab_size = vocab_size_in_checkpoint
+        """
 
     def configure_optimizers(self):
         if self.config.use_lora:
