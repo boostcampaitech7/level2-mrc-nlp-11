@@ -34,21 +34,29 @@ class MrcLightningModule(pl.LightningModule):
         self.kkma = Kkma()
         self.save_hyperparameters()
         self.config = config
+        if "name" in self.config.optimizer:
+            self.optimizer_name = self.config.optimizer.name
+            del self.config.optimizer.name
+        else:
+            self.optimizer_name = "AdamW"
 
+        # load tokenizer and model
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.model.plm_name)
-        tokens = list(self.config.data.add_special_token)
-        tokens = [str(t) for t in tokens]
-        special_tokens_dict = {"additional_special_tokens": tokens}
-        num_added_tokens = self.tokenizer.add_special_tokens(special_tokens_dict)
-
         self.model = AutoModelForQuestionAnswering.from_pretrained(
             self.config.model.plm_name
         )
-        self.model.resize_token_embeddings(len(self.tokenizer))
-        self.model.config.vocab_size = len(self.tokenizer)
+        # Add special token
+        if len(self.config.data.add_special_token) != 0:
+            self.tokenizer.add_special_tokens(
+                {"additional_special_tokens": list(self.config.data.add_special_token)}
+            )
+            self.model.resize_token_embeddings(
+                self.model.config.vocab_size + len(self.config.data.add_special_token)
+            )
         # Apply LoRA if necessary
-        # if self.config.use_lora:
-        #     self.apply_lora()
+        if self.config.use_lora:
+            self.apply_lora()
+
         self.eval_dataset = eval_dataset
         self.test_dataset = test_dataset
         self.eval_examples = eval_examples
@@ -87,14 +95,6 @@ class MrcLightningModule(pl.LightningModule):
         self.test_dataset = None
         self.eval_examples = None
         self.test_examples = None
-        state_dict = checkpoint["state_dict"]
-        # Extract the vocab size from the embedding weights in the checkpoint
-        embedding_weight = state_dict["model.roberta.embeddings.word_embeddings.weight"]
-        vocab_size_in_checkpoint = embedding_weight.size(0)
-
-        # Resize the model's embeddings
-        self.model.resize_token_embeddings(vocab_size_in_checkpoint)
-        self.model.config.vocab_size = vocab_size_in_checkpoint
 
     def configure_optimizers(self):
         if self.config.use_lora:
@@ -108,10 +108,8 @@ class MrcLightningModule(pl.LightningModule):
             # Train all parameters that require grad
             trainable_params = [p for p in self.model.parameters() if p.requires_grad]
 
-        optimizer_name = self.config.optimizer.name
-        del self.config.optimizer.name
         optimizer = init_obj(
-            optimizer_name, self.config.optimizer, torch.optim, trainable_params
+            self.optimizer_name, self.config.optimizer, torch.optim, trainable_params
         )
         return optimizer
 

@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import pytorch_lightning as pl
 
 from module.data import *
-from module.mrc1 import *
+from module.mrc import *
 from module.retrieval import *
 from datasets import load_from_disk, Dataset
 
@@ -135,7 +135,6 @@ def main(
             get_dataset_list(["default"])
         test_examples = load_from_disk("./data/test_dataset/")["validation"]
 
-        """
         if not run_retrieval:
             return
 
@@ -147,26 +146,17 @@ def main(
             )
         else:
             # 2.2. use rerank
-            rerank_k=10 * top_k
+            rerank_k = 10 * top_k
             final_k = top_k
             docs_score, docs_idx, docs, titles = [], [], [], []
             for question in test_examples["question"]:
-                score, idx, doc, title = retrieval.search(question, rerank_k=rerank_k, final_k=final_k)
+                score, idx, doc, title = retrieval.search(
+                    question, rerank_k=rerank_k, final_k=final_k
+                )
                 docs_score.append(score)
                 docs_idx.append(idx)
                 docs.append(doc)
                 titles.append(title)
-        """
-        with open(
-            "/data/ephemeral/home/gj/level2-mrc-nlp-11/sparse-morphs_dense-ng=17=bz=4-ot=1.json",
-            "r",
-            encoding="utf-8",
-        ) as json_file:
-            data = json.load(json_file)
-        docs_score = data["docs_score"]
-        docs_idx = data["docs_idx"]
-        docs = data["docs"]
-        titles = data["titles"]
 
         if "title_context_merge_token" in config.data.preproc_list:
             docs = [
@@ -261,5 +251,3 @@ if __name__ == "__main__":
         mode,
         use_separate_inference,
     )
-
-# combine

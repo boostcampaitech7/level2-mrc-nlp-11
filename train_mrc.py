@@ -37,23 +37,31 @@ def main(config):
     eval_examples = data_module.eval_examples
     test_examples = data_module.test_examples
     checkpoint_path = config.checkpoint_path
+    # 1. transfer-learning
     if checkpoint_path:
         model_module = MrcLightningModule.load_from_checkpoint(
             checkpoint_path,
-            config=config,
-            strict=False,
+            # strict=False,
         )
-        # model_module.model.resize_token_embeddings(
-        #         model_module.model.config.vocab_size + len(config.data.add_special_token)
-        # )
-        if config.use_lora:
-            model_module.apply_lora()
 
-        model_module.optimizer_name = "AdamW"
+        # change optimizer
+        model_module.optimizer_name = config.optimizer.name
+        # insert special token
+        if (
+            len(model_module.config.data.add_special_token) == 0
+            and len(config.data.add_special_token) != 0
+        ):
+            model_module.config.data.add_special_token = config.data.add_special_token
+            model_module.model.resize_token_embeddings(
+                model_module.model.config.vocab_size
+                + len(model_module.config.data.add_special_token)
+            )
+
         model_module.eval_dataset = data_module.eval_dataset
         model_module.test_dataset = data_module.test_dataset
         model_module.eval_examples = data_module.eval_examples
         model_module.test_examples = data_module.test_examples
+    # 2. pre-training
     else:
         # 2. set mrc module(=pl.LightningModule class)
         model_module = MrcLightningModule(
