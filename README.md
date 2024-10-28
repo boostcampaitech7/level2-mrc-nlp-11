@@ -49,25 +49,25 @@ MRC 단계에서는 Reader 모델이 Retriever가 찾은 문서들에서 질문�
 <br />
 <br />
 
-**3.2 코드 구조**
+**3.2 프로젝트 폴더 구조**
 
 ```
 template
 ├── config/
-|   ├── retrieval.py					# Retreival 설정 파일
-|	  └── mrc.py								# MRC 설정 파일
+|   ├── retrieval.py               # Retreival 설정 파일
+|   └── mrc.py                     # MRC 설정 파일
 ├── module/
-|   ├── loss.py								# loss 함수 (torch)
-|   ├── metric.py							# metric 함수 (huggingface.evaluate)
-|   ├── data.py								# data 클래스 (pl.LightningDataModule)
-|   ├── encoder.py						# Retrieval 인코더 클래스 (AutoPretrainedModel)
-|   ├── retrieval.py					# Retrieval 모델 클래스 (pl.LightningModule)
-│   └── mrc.py								# MRC 모델 클래스 (pl.LightningModule)
-├── utils/										
-├── inference.py							# validation/test dataset 추론 파일
-├── train_mrc.py							# MRC 모델 학습 파일
-├── train_dense_retrieval.py	# dense retrieval 모델 학습 파일
-└── train_sparse_retrieval.py	# sparse retrieval 모델 학습 파일
+|   ├── loss.py                    # loss 함수 (torch)
+|   ├── metric.py                  # metric 함수 (huggingface.evaluate)
+|   ├── data.py                    # data 클래스 (pl.LightningDataModule)
+|   ├── encoder.py                 # Retrieval 인코더 클래스 (AutoPretrainedModel)
+|   ├── retrieval.py               # Retrieval 모델 클래스 (pl.LightningModule)
+│   └── mrc.py                     # MRC 모델 클래스 (pl.LightningModule)
+├── utils/                         
+├── inference.py                   # validation/test dataset 추론 파일
+├── train_mrc.py                   # MRC 모델 학습 파일
+├── train_dense_retrieval.py       # dense retrieval 모델 학습 파일
+└── train_sparse_retrieval.py      # sparse retrieval 모델 학습 파일
 ```
 
 <br />
@@ -79,7 +79,7 @@ template
 <img width="450" src="https://github.com/user-attachments/assets/85527467-6513-422e-9b62-496fd299607b" />
 
 
-- 위키피디아 문서를 `klue/bert-base` 토크나이저로 토큰화했을 때, ****문서별 토큰 개수의 분포 그래프
+- 위키피디아 문서를 `klue/bert-base` 토크나이저로 토큰화했을 때, 문서별 토큰 개수의 분포 그래프
 - V100 GPU에서 학습 가능한 모델의 최대 토큰 길이는 일반적으로 512개로 제한
     
     → 이로 인해, 위키피디아 문서 중 20% 이상에서는 overflow token이 발생
