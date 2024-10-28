@@ -320,6 +320,7 @@ class MrcLightningModule(pl.LightningModule):
                         "score": feature_null_score,
                         "start_logit": start_logits[0],
                         "end_logit": end_logits[0],
+                        "example_id": example_index,
                     }
 
                 # Go through all possibilities for the `n_best_size` greater start and end logits.
@@ -392,6 +393,7 @@ class MrcLightningModule(pl.LightningModule):
                 offsets = pred.pop("offsets")
                 pred["text"] = self.remove_last_josa(context[offsets[0] : offsets[1]])
                 pred["start"] = offsets[0]
+                pred["context"] = context
 
             # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
             # failure.
@@ -406,6 +408,8 @@ class MrcLightningModule(pl.LightningModule):
                         "end_logit": 0.0,
                         "score": 0.0,
                         "start": 0,
+                        "example_id": 0,
+                        "context": "",
                     },
                 )
 
@@ -591,7 +595,7 @@ class MrcLightningModule(pl.LightningModule):
                 )
 
                 # Update minimum null prediction.
-                feature_null_score = start_logits[0] + end_logits[0] * doc_score
+                feature_null_score = (start_logits[0] + end_logits[0]) * doc_score
 
                 if (
                     min_null_prediction is None
@@ -603,7 +607,6 @@ class MrcLightningModule(pl.LightningModule):
                         "start_logit": start_logits[0],
                         "end_logit": end_logits[0],
                         "example_id": example_index,
-                        "document_id": example["document_id"],
                     }
 
                 # Go through all possibilities for the `n_best_size` greater start and end logits.
@@ -653,7 +656,6 @@ class MrcLightningModule(pl.LightningModule):
                                 "start_logit": start_logits[start_index],
                                 "end_logit": end_logits[end_index],
                                 "example_idx": example_index,
-                                "document_id": example["document_id"],
                             }
                         )
             if version_2_with_negative and min_null_prediction is not None:
@@ -681,6 +683,7 @@ class MrcLightningModule(pl.LightningModule):
                 offsets = pred.pop("offsets")
                 pred["text"] = context[offsets[0] : offsets[1]]
                 pred["start"] = offsets[0]
+                pred["context"] = context
 
             # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
             # failure.
@@ -696,7 +699,7 @@ class MrcLightningModule(pl.LightningModule):
                         "score": 0.0,
                         "start": 0,
                         "example_idx": 0,
-                        "document_id": 0,
+                        "context": "",
                     },
                 )
 
