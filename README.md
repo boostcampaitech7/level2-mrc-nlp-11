@@ -13,10 +13,14 @@ MRC 단계에서는 Reader 모델이 Retriever가 찾은 문서들에서 질문�
 
 <img width="600" src="https://github.com/user-attachments/assets/fd591a7d-9c14-4597-8a7d-2811a42f1c61" />
 
+<br />
+<br />
 
 **1.2 평가지표**
 
 본 대회의 평가지표는 Exact Match(EM)으로, 전체 샘플 중 예측과 정답이 정확히 일치하는 샘플의 비율로 측정한다.
+
+<br />
 
 ## 2 프로젝트 팀 구성 및 역할
 
@@ -31,6 +35,8 @@ MRC 단계에서는 Reader 모델이 Retriever가 찾은 문서들에서 질문�
 | **이재협** | <img alt="이재협" width="140" height="140" src="https://github.com/user-attachments/assets/75b8ef71-6afe-4654-9843-a0913937a1de" /> | - Streamlit 데이터 뷰어 제작, 데이터 전처리(위키피디아 문서 전처리) <br /> - 데이터 증강(기존 질문 수정) <br /> - Reader(Separate Inference) | [jhyeop](https://github.com/jhyeop) |
 | **임상엽** | <img alt="임상엽" width="140" height="140" src="https://github.com/user-attachments/assets/2d66dd95-8c1c-4441-9511-6bf2fc3b06170" /> | - Disk Manager 구현 <br /> - Commitizen 설정 <br /> - 데이터 전처리(Question 타입 분류) <br /> - Reader(Transfer Learning) | [gityeop](https://github.com/gityeop) |
 
+<br />
+
 ## 3 프로젝트
 
 **3.1 프로젝트 진행 일정**
@@ -38,8 +44,10 @@ MRC 단계에서는 Reader 모델이 Retriever가 찾은 문서들에서 질문�
 - EDA, 전처리, 증강, Reader, Retriever, 앙상블 순서로 진행
 - 각 단계는 회의, 분담, 이슈생성, 작업(Commit, Push), Pull Request, Merge 순서로 진행
 
-<img width="700" alt="project" src="https://github.com/user-attachments/assets/ced065f6-d20b-4a40-8925-a2bf3e255b27">
+<img width="700" alt="project" src="https://github.com/user-attachments/assets/ced065f6-d20b-4a40-8925-a2bf3e255b27" />
 
+<br />
+<br />
 
 **3.2 코드 구조**
 
@@ -62,6 +70,8 @@ template
 └── train_sparse_retrieval.py	# sparse retrieval 모델 학습 파일
 ```
 
+<br />
+
 ## 4 EDA
 
 **4.1 위키피디아 문서별 토큰 개수의 분포**
@@ -78,6 +88,7 @@ template
     
     → 이러한 문제를 해결하기 위해 overflow token을 학습에 포함하는 실험을 진행할 예정이다.
     
+<br />
 
 **4.2 질문 유형 분석**
 
@@ -90,6 +101,8 @@ template
 - 인물에 대한 질문이 가장 많음
 - 인물의 이름과 같은 고유 명사는 토크나이징이 적절히 되지 않아서 이를 위한 처리가 필요할 것으로 생각
 
+<br />
+
 **4.3 train/validation 데이터셋의 context 수와 위키피디아 문서 수 비교**
 
 <img width="450" src="https://github.com/user-attachments/assets/d4afcd18-d7db-42d3-9832-fadc865575c6" />
@@ -101,6 +114,8 @@ template
 - 특정 문서가 QA 데이터에서 과도하게 사용되는 경우가 거의 없고, 다양한 문서가 QA 데이터셋에 고루 분포됨
     
     → train/validation 문서를 이용해 QA 데이터셋 증강 가능
+
+<br />
     
 <img width="450" src="https://github.com/user-attachments/assets/26268787-ba4d-4b0e-b0e8-54d49d9dc79d" />
 
@@ -109,7 +124,8 @@ template
 - 아직 많은 문서가 QA 데이터셋에 포함되지 않았음을 의미
     
     → QA 데이터셋에 포함되지 않은 위키피디아 문서들을 대상으로 새로운 QA 질문을 생성하거나 데이터 증강을 시도할 수 있는 잠재적인 기회가 많이 존재한다고 볼 수 있음
-    
+
+<br />
 
 **4.4 위키피디아 문서 분석**
 
@@ -120,7 +136,8 @@ template
 - 특히 TF-IDF retriever로 테스트해본 결과, `\`, `*` `p=` 등과 같이 마크다운, 인용 표시 등으로부터 추출된 토큰이 일부 문서에서 높은 점수를 얻는 경우도 확인됨
     
      → 문서의 내용과 관련 없는 불필요한 문자열을 HTML태그, 코드, 인용 표시, URL, 주석 문구 등으로 분류하고, 각 종류별로 적절하게 전처리 또는 제거해주는 실험 계획
-    
+
+<br />
 
 ## 5 프로젝트 수행
 
@@ -146,6 +163,8 @@ template
 
 - Hard Voting
 
+<br />
+
 ## 6 Wrap-up Report
 
-자세한 내용은 <a href="https://github.com/boostcampaitech7/level2-mrc-nlp-11/blob/docs-55/upload_readme_report/ODQA%EB%8C%80%ED%9A%8C_NLP_%ED%8C%80%20%EB%A6%AC%ED%8F%AC%ED%8A%B8(11%EC%A1%B0).pdf">**Wrap-up Report**<a />를 참고하세요 !
+자세한 내용은 <a href="https://github.com/boostcampaitech7/level2-mrc-nlp-11/blob/docs-55/upload_readme_report/ODQA%EB%8C%80%ED%9A%8C_NLP_%ED%8C%80%20%EB%A6%AC%ED%8F%AC%ED%8A%B8(11%EC%A1%B0).pdf">**Wrap-up Report**</a>를 참고해 주세요 !
