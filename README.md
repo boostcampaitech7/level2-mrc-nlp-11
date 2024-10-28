@@ -11,7 +11,7 @@ Passage Retrieval 단계에서 Retriever는 질문의 답변이 포함되어 있
 2. **MRC(Machine Reading Comprehension) - Reader**
 MRC 단계에서는 Reader 모델이 Retriever가 찾은 문서들에서 질문의 답변에 해당하는 텍스트를 찾는다. 본 대회에서는 문서에서 답변에 해당하는 텍스트를 직접 추출하는 **Extraction-based QA**를 수행하므로, 답변의 시작 위치와, 끝 위치를 예측하도록 모델을 학습시킨다.
 
-![odqa](https://github.com/user-attachments/assets/fd591a7d-9c14-4597-8a7d-2811a42f1c61)
+<img width="600" src="https://github.com/user-attachments/assets/fd591a7d-9c14-4597-8a7d-2811a42f1c61" />
 
 
 **1.2 평가지표**
@@ -38,12 +38,12 @@ MRC 단계에서는 Reader 모델이 Retriever가 찾은 문서들에서 질문�
 - EDA, 전처리, 증강, Reader, Retriever, 앙상블 순서로 진행
 - 각 단계는 회의, 분담, 이슈생성, 작업(Commit, Push), Pull Request, Merge 순서로 진행
 
-<img width="953" alt="project" src="https://github.com/user-attachments/assets/ced065f6-d20b-4a40-8925-a2bf3e255b27">
+<img width="700" alt="project" src="https://github.com/user-attachments/assets/ced065f6-d20b-4a40-8925-a2bf3e255b27">
 
 
 **3.2 코드 구조**
 
-```bash
+```
 template
 ├── config/
 |   ├── retrieval.py					# Retreival 설정 파일
@@ -66,7 +66,7 @@ template
 
 **4.1 위키피디아 문서별 토큰 개수의 분포**
 
-![image](https://github.com/user-attachments/assets/85527467-6513-422e-9b62-496fd299607b)
+<img width="450" src="https://github.com/user-attachments/assets/85527467-6513-422e-9b62-496fd299607b" />
 
 
 - 위키피디아 문서를 `klue/bert-base` 토크나이저로 토큰화했을 때, ****문서별 토큰 개수의 분포 그래프
@@ -81,17 +81,18 @@ template
 
 **4.2 질문 유형 분석**
 
-![5ro](https://github.com/user-attachments/assets/e57248e7-2f34-45ff-9286-a777ecbf1ea8)
-![7ro](https://github.com/user-attachments/assets/5e0f7d64-33d7-488f-ae91-ad61f71f6b77)
-![10ro](https://github.com/user-attachments/assets/e791f61f-9ff4-4f2c-8095-6a504d6fb417)
-
+<div display="flex">
+    <img width="320" src="https://github.com/user-attachments/assets/e57248e7-2f34-45ff-9286-a777ecbf1ea8" />
+    <img width="320" src="https://github.com/user-attachments/assets/5e0f7d64-33d7-488f-ae91-ad61f71f6b77" />
+    <img width="320" src="https://github.com/user-attachments/assets/e791f61f-9ff4-4f2c-8095-6a504d6fb417" />
+</div>
 
 - 인물에 대한 질문이 가장 많음
 - 인물의 이름과 같은 고유 명사는 토크나이징이 적절히 되지 않아서 이를 위한 처리가 필요할 것으로 생각
 
 **4.3 train/validation 데이터셋의 context 수와 위키피디아 문서 수 비교**
 
-![anstj](https://github.com/user-attachments/assets/d4afcd18-d7db-42d3-9832-fadc865575c6)
+<img width="450" src="https://github.com/user-attachments/assets/d4afcd18-d7db-42d3-9832-fadc865575c6" />
 
 
 - Train 데이터셋에서는 일부 문서가 두 번 혹은 세 번 사용된 경우도 있으나, 전반적으로 매우 적은 빈도로 사용됨
@@ -101,12 +102,10 @@ template
     
     → train/validation 문서를 이용해 QA 데이터셋 증강 가능
     
-![wmdrkd](https://github.com/user-attachments/assets/26268787-ba4d-4b0e-b0e8-54d49d9dc79d)
+<img width="450" src="https://github.com/user-attachments/assets/26268787-ba4d-4b0e-b0e8-54d49d9dc79d" />
 
 
-위키피디아 문서 중 QA 데이터셋에 사용된 것의 비율
-
-- **5.8%**의 문서만이 QA 데이터셋에서 사용되었고, **94.2%**의 위키피디아 문서가 QA 데이터에서 사용되지 않음
+- 5.8%의 문서만이 QA 데이터셋에서 사용되었고, 94.2%의 위키피디아 문서가 QA 데이터에서 사용되지 않음
 - 아직 많은 문서가 QA 데이터셋에 포함되지 않았음을 의미
     
     → QA 데이터셋에 포함되지 않은 위키피디아 문서들을 대상으로 새로운 QA 질문을 생성하거나 데이터 증강을 시도할 수 있는 잠재적인 기회가 많이 존재한다고 볼 수 있음
@@ -116,7 +115,7 @@ template
 
 - 위키피디아 문서 중 아래 예시와 같이 마크다운 태그, 주석 문구, URL, 인용 표시 등 문서 본문의 내용과 크게 관련 없는 문자열이 섞여 있는 경우가 일부 있음
 
-  ![wikid](https://github.com/user-attachments/assets/c0ae9ce6-a55c-439f-996d-540ba59b4880)
+  <img width="450" src="https://github.com/user-attachments/assets/c0ae9ce6-a55c-439f-996d-540ba59b4880" />
 
 - 특히 TF-IDF retriever로 테스트해본 결과, `\`, `*` `p=` 등과 같이 마크다운, 인용 표시 등으로부터 추출된 토큰이 일부 문서에서 높은 점수를 얻는 경우도 확인됨
     
