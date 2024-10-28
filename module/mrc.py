@@ -1,14 +1,20 @@
+# 표준 라이브러리
 import collections, json, logging, os
 from typing import Optional, Tuple
-from tqdm.auto import tqdm
+
+# 서드파티 라이브러리
 import numpy as np
 import torch
 import pytorch_lightning as pl
-from transformers import AutoModelForQuestionAnswering, EvalPrediction
+from tqdm.auto import tqdm
+from transformers import AutoModelForQuestionAnswering, EvalPrediction, AutoTokenizer
 from evaluate import load
+from peft import LoraConfig, get_peft_model
+from konlpy.tag import Kkma
+
+# 로컬 모듈
 from utils.common import init_obj
 import module.metric as module_metric
-from konlpy.tag import Kkma
 
 
 logger = logging.getLogger(__name__)
@@ -28,14 +34,28 @@ class MrcLightningModule(pl.LightningModule):
         self.kkma = Kkma()
         self.save_hyperparameters()
         self.config = config
+        if "name" in self.config.optimizer:
+            self.optimizer_name = self.config.optimizer.name
+            del self.config.optimizer.name
+        else:
+            self.optimizer_name = "AdamW"
+
+        # load tokenizer and model
+        self.tokenizer = AutoTokenizer.from_pretrained(self.config.model.plm_name)
         self.model = AutoModelForQuestionAnswering.from_pretrained(
             self.config.model.plm_name
         )
-        # model의 임베딩 크기 수정
+        # Add special token
         if len(self.config.data.add_special_token) != 0:
+            self.tokenizer.add_special_tokens(
+                {"additional_special_tokens": list(self.config.data.add_special_token)}
+            )
             self.model.resize_token_embeddings(
                 self.model.config.vocab_size + len(self.config.data.add_special_token)
             )
+        # Apply LoRA if necessary
+        if self.config.use_lora:
+            self.apply_lora()
 
         self.eval_dataset = eval_dataset
         self.test_dataset = test_dataset
@@ -47,6 +67,22 @@ class MrcLightningModule(pl.LightningModule):
             for metric in self.config.metric
         }
         self.inference_mode = inference_mode
+
+    def apply_lora(self):
+        if self.config.use_lora:
+            lora_config = LoraConfig(
+                r=16,
+                lora_alpha=32,
+                target_modules=["query", "key"],
+                lora_dropout=0.2,
+                bias="none",
+            )
+            self.model = get_peft_model(self.model, lora_config)
+            for param in self.model.base_model.parameters():
+                param.requires_grad = False
+            for n, p in self.model.named_parameters():
+                if "lora_" in n:
+                    p.requires_grad = True
 
     def on_save_checkpoint(self, checkpoint):
         del checkpoint["hyper_parameters"]["eval_dataset"]
@@ -61,14 +97,19 @@ class MrcLightningModule(pl.LightningModule):
         self.test_examples = None
 
     def configure_optimizers(self):
-        trainable_params = list(
-            filter(lambda p: p.requires_grad, self.model.parameters())
-        )
+        if self.config.use_lora:
+            # Filter parameters that are LoRA parameters
+            trainable_params = [
+                p
+                for n, p in self.model.named_parameters()
+                if p.requires_grad and "lora_" in n
+            ]
+        else:
+            # Train all parameters that require grad
+            trainable_params = [p for p in self.model.parameters() if p.requires_grad]
 
-        optimizer_name = self.config.optimizer.name
-        del self.config.optimizer.name
         optimizer = init_obj(
-            optimizer_name, self.config.optimizer, torch.optim, trainable_params
+            self.optimizer_name, self.config.optimizer, torch.optim, trainable_params
         )
         return optimizer
 
@@ -229,6 +270,7 @@ class MrcLightningModule(pl.LightningModule):
 
         # Build a map example to its corresponding features.
         example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
+
         features_per_example = collections.defaultdict(list)
         for i, feature in enumerate(features):
             features_per_example[example_id_to_index[feature["example_id"]]].append(i)
@@ -278,6 +320,7 @@ class MrcLightningModule(pl.LightningModule):
                         "score": feature_null_score,
                         "start_logit": start_logits[0],
                         "end_logit": end_logits[0],
+                        "example_id": example_index,
                     }
 
                 # Go through all possibilities for the `n_best_size` greater start and end logits.
@@ -350,6 +393,7 @@ class MrcLightningModule(pl.LightningModule):
                 offsets = pred.pop("offsets")
                 pred["text"] = self.remove_last_josa(context[offsets[0] : offsets[1]])
                 pred["start"] = offsets[0]
+                pred["context"] = context
 
             # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
             # failure.
@@ -364,6 +408,8 @@ class MrcLightningModule(pl.LightningModule):
                         "end_logit": 0.0,
                         "score": 0.0,
                         "start": 0,
+                        "example_id": 0,
+                        "context": "",
                     },
                 )
 
@@ -422,8 +468,10 @@ class MrcLightningModule(pl.LightningModule):
             parent_directory = os.path.dirname(
                 os.path.dirname(os.path.abspath(__file__))
             )
-
-            run_name = f"{self.config.data.preproc_list[0]}_{self.config.data.dataset_name[0]}_bz={self.config.data.batch_size}_lr={self.config.optimizer.lr}"
+            dataset_name = ""
+            for name in self.config.data.dataset_name:
+                dataset_name += name + "_"
+            run_name = f"lora_{self.config.use_lora}_{self.config.data.preproc_list[0]}_{dataset_name}bz={self.config.data.batch_size}_lr={self.config.optimizer.lr}"
 
             prediction_file = os.path.join(
                 parent_directory,
@@ -547,7 +595,7 @@ class MrcLightningModule(pl.LightningModule):
                 )
 
                 # Update minimum null prediction.
-                feature_null_score = start_logits[0] + end_logits[0] * doc_score
+                feature_null_score = (start_logits[0] + end_logits[0]) * doc_score
 
                 if (
                     min_null_prediction is None
@@ -559,7 +607,6 @@ class MrcLightningModule(pl.LightningModule):
                         "start_logit": start_logits[0],
                         "end_logit": end_logits[0],
                         "example_id": example_index,
-                        "document_id": example["document_id"],
                     }
 
                 # Go through all possibilities for the `n_best_size` greater start and end logits.
@@ -609,7 +656,6 @@ class MrcLightningModule(pl.LightningModule):
                                 "start_logit": start_logits[start_index],
                                 "end_logit": end_logits[end_index],
                                 "example_idx": example_index,
-                                "document_id": example["document_id"],
                             }
                         )
             if version_2_with_negative and min_null_prediction is not None:
@@ -637,6 +683,7 @@ class MrcLightningModule(pl.LightningModule):
                 offsets = pred.pop("offsets")
                 pred["text"] = context[offsets[0] : offsets[1]]
                 pred["start"] = offsets[0]
+                pred["context"] = context
 
             # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
             # failure.
@@ -652,7 +699,7 @@ class MrcLightningModule(pl.LightningModule):
                         "score": 0.0,
                         "start": 0,
                         "example_idx": 0,
-                        "document_id": 0,
+                        "context": "",
                     },
                 )
 
@@ -711,8 +758,10 @@ class MrcLightningModule(pl.LightningModule):
             parent_directory = os.path.dirname(
                 os.path.dirname(os.path.abspath(__file__))
             )
-
-            run_name = f"{self.config.data.preproc_list[0]}_{self.config.data.dataset_name[0]}_bz={self.config.data.batch_size}_lr={self.config.optimizer.lr}"
+            dataset_name = ""
+            for name in self.config.data.dataset_name:
+                dataset_name += name + "_"
+            run_name = f"lora_{self.config.use_lora}_{self.config.data.preproc_list[0]}_{dataset_name}bz={self.config.data.batch_size}_lr={self.config.optimizer.lr}"
 
             prediction_file = os.path.join(
                 parent_directory,

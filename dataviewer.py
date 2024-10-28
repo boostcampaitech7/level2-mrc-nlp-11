@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import numpy as np
 from datasets import load_from_disk
@@ -24,8 +25,7 @@ load_dotenv()
 @st.cache_data
 def load_wiki():
     wiki_path = (
-        os.getenv("DIR_PATH")
-        + "/level2-mrc-nlp-11/data/normalized_wikipedia_documents.json"
+        os.getenv("DIR_PATH") + "/level2-mrc-nlp-11/data/wikipedia_documents.json"
     )
     with open(wiki_path, "r", encoding="utf-8") as f:
         wiki = json.load(f)

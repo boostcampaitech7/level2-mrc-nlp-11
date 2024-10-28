@@ -634,7 +634,7 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
         result = self.result_list[idx]
         print("=" * 20)
         print("QUESTION: ")
-        display(HTML(result["question"]))
+        print(result["question"])
         print("=" * 20)
         print(
             f"{self.result_method1}-PREDICT-CONTEXT: {result['retrieval1_is_correct']}"
@@ -645,7 +645,7 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
                 f"{self.result_method1}-SCORE OF TOP-{idx+1} PREDICT-CONTEXT: {result['retrieval1-predict-context_retrieval1-values'][idx]}"
             )
             print("-" * 20)
-            display(HTML(result["retrieval1-predict-context"][idx]))
+            print(result["retrieval1-predict-context"][idx])
             print("=" * 20)
 
         display("=" * 20)
@@ -654,7 +654,7 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
             f"{self.result_method1}-SCORE OF ANSWER-CONTEXT: {result['answer-context_retrieval1-values']}"
         )
         print("-" * 20)
-        display(HTML(result["answer-context"]))
+        print(result["answer-context"])
         print("=" * 20)
         print()
         print("\n\n\n")
@@ -664,7 +664,7 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
         result = self.result_list[idx]
         print("=" * 20)
         print("QUESTION: ")
-        display(HTML(result["question"]))
+        print(result["question"])
         print("=" * 20)
         print(
             f"{self.result_method1}-PREDICT-CONTEXT: {result['retrieval1_is_correct']}"
@@ -678,7 +678,7 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
                 f"{self.result_method2}-SCORE OF TOP-{idx+1} {self.result_method1}-PREDICT-CONTEXT: {result['retrieval1-predict-context_retrieval2-values'][idx]}"
             )
             print("-" * 20)
-            display(HTML(result["retrieval1-predict-context"][idx]))
+            print(result["retrieval1-predict-context"][idx])
             print("=" * 20)
 
         display("=" * 20)
@@ -693,7 +693,7 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
                 f"{self.result_method2}-SCORE OF TOP-{idx+1} {self.result_method2}-PREDICT-CONTEXT: {result['retrieval2-predict-context_retrieval2-values'][idx]}"
             )
             print("-" * 20)
-            display(HTML(result["retrieval2-predict-context"][idx]))
+            print(result["retrieval2-predict-context"][idx])
             print("=" * 20)
 
         display("=" * 20)
@@ -705,7 +705,7 @@ class DenseRetrievalResultViewer(RetrievalResultViewer):
             f"{self.result_method1}-SCORE OF ANSWER-CONTEXT: {result['answer-context_retrieval2-values']}"
         )
         print("-" * 20)
-        display(HTML(result["answer-context"]))
+        print(result["answer-context"])
         print("=" * 20)
         print()
         print("\n\n\n")
@@ -839,14 +839,14 @@ class SparseRetrievalResultViewer(RetrievalResultViewer):
         result = self.result_list[idx]
         print("=" * 20)
         print("QUESTION: ")
-        display(HTML(result["question"]))
+        print(result["question"])
         print("=" * 20)
 
         display("=" * 20)
         print(
             f"{self.result_method1}-PREDICT-CONTEXT: {result['retrieval1_is_correct']}"
         )
-        display(HTML(result["retrieval1-predict-context"][0]))
+        print(result["retrieval1-predict-context"][0])
         print("-" * 20)
         print(f"{self.result_method1}-VALUE OF {self.result_method1}-PREDICT-CONTEXT: ")
         print(
@@ -856,7 +856,7 @@ class SparseRetrievalResultViewer(RetrievalResultViewer):
 
         display("=" * 20)
         print("ANSWER-CONTEXT: ")
-        display(HTML(result["answer-context"]))
+        print(result["answer-context"])
         print("-" * 20)
         print(f"{self.result_method1}-VALUE OF ANSWER-CONTEXT: ")
         print(self.simplify_data(result["answer-context_retrieval1-values"]))
@@ -869,14 +869,14 @@ class SparseRetrievalResultViewer(RetrievalResultViewer):
         result = self.result_list[idx]
         print("=" * 20)
         print("QUESTION: ")
-        display(HTML(result["question"]))
+        print(result["question"])
         print("=" * 20)
 
         display("=" * 20)
         print(
             f"{self.result_method1}-PREDICT-CONTEXT: {result['retrieval1_is_correct']}"
         )
-        display(HTML(result["retrieval1-predict-context"][0]))
+        print(result["retrieval1-predict-context"][0])
         print("-" * 20)
         print(f"{self.result_method1}-VALUE OF {self.result_method1}-PREDICT-CONTEXT: ")
         print(
@@ -893,7 +893,7 @@ class SparseRetrievalResultViewer(RetrievalResultViewer):
         print(
             f"{self.result_method2}-PREDICT-CONTEXT: {result['retrieval2_is_correct']}"
         )
-        display(HTML(result["retrieval2-predict-context"][0]))
+        print(result["retrieval2-predict-context"][0])
         print("-" * 20)
         print(f"{self.result_method1}-VALUE OF {self.result_method2}-PREDICT-CONTEXT: ")
         print(
@@ -908,7 +908,7 @@ class SparseRetrievalResultViewer(RetrievalResultViewer):
 
         display("=" * 20)
         print("ANSWER-CONTEXT: ")
-        display(HTML(result["answer-context"]))
+        print(result["answer-context"])
         print("-" * 20)
         print(f"{self.result_method1}-VALUE OF ANSWER-CONTEXT: ")
         print(self.simplify_data(result["answer-context_retrieval1-values"]))

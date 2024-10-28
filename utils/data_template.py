@@ -286,67 +286,66 @@ def klue_mrc():
         os.makedirs(f"{parent_directory}/data/")
     final_dataset.save_to_disk(f"{parent_directory}/data/klue_mrc")
 
+
 # ETRI_MRC_v1 데이터셋 구조 동일하기
 def etri_mrc():
-    data_pass = "/home/ppg/Desktop/AI Tech 7기/NLP/2. MRC/try/try0/20181101_ETRI_MRC_v1.json"
-    with open(data_pass, 'r', encoding="utf-8") as f:
+    data_pass = (
+        "/home/ppg/Desktop/AI Tech 7기/NLP/2. MRC/try/try0/20181101_ETRI_MRC_v1.json"
+    )
+    with open(data_pass, "r", encoding="utf-8") as f:
         dataset = json.load(f)
 
     formatted_dataset_dict = {
-        'title': [],
-        'context': [],
-        'question': [],
-        'id': [],
-        'answers': None,
+        "title": [],
+        "context": [],
+        "question": [],
+        "id": [],
+        "answers": None,
     }
 
     answer_starts = []
     answer_texts = []
 
     for qa in dataset["data"]:
-        title = qa['title']
-        for paragraph in qa['paragraphs']:
-            context = paragraph['context']
-            for question_set in paragraph['qas']:
-                id = f"etri_{question_set['id']}" # 
-                question = question_set['question']
+        title = qa["title"]
+        for paragraph in qa["paragraphs"]:
+            context = paragraph["context"]
+            for question_set in paragraph["qas"]:
+                id = f"etri_{question_set['id']}"  #
+                question = question_set["question"]
 
-                answer_text = [question_set['answers'][0]['text']]
-                answer_start = [question_set['answers'][0]['answer_start']]
+                answer_text = [question_set["answers"][0]["text"]]
+                answer_start = [question_set["answers"][0]["answer_start"]]
 
                 answer_starts.append(answer_start)
                 answer_texts.append(answer_text)
 
-                formatted_dataset_dict['id'].append(id)
-                formatted_dataset_dict['question'].append(question)
-                formatted_dataset_dict['context'].append(context)
-                formatted_dataset_dict['title'].append(title)
+                formatted_dataset_dict["id"].append(id)
+                formatted_dataset_dict["question"].append(question)
+                formatted_dataset_dict["context"].append(context)
+                formatted_dataset_dict["title"].append(title)
 
-    formatted_dataset_dict['answers'] = Dataset.from_dict(
-        {
-            'text':answer_texts,
-            'answer_start':answer_starts
-        }
+    formatted_dataset_dict["answers"] = Dataset.from_dict(
+        {"text": answer_texts, "answer_start": answer_starts}
     )
 
     formatted_dataset = Dataset.from_dict(
-        formatted_dataset_dict,
-        features = get_standard_features()
+        formatted_dataset_dict, features=get_standard_features()
     )
 
     split_dataset = formatted_dataset.train_test_split(test_size=0.2)
-    train_dataset = split_dataset['train']
-    validation_dataset = split_dataset['test']
+    train_dataset = split_dataset["train"]
+    validation_dataset = split_dataset["test"]
 
     final_dataset = DatasetDict(
-        {'train':train_dataset,
-         'validation':validation_dataset}
+        {"train": train_dataset, "validation": validation_dataset}
     )
 
     parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if not os.path.exists(f"{parent_directory}/data/"):
         os.makedirs(f"{parent_directory}/data/")
     final_dataset.save_to_disk(f"{parent_directory}/data/etri_mrc")
+
 
 def sparse_retrieval_neg_sampling():
     parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -441,7 +440,7 @@ def sparse_retrieval_neg_sampling():
         f"minimum size of train neg sample: {train_min_len}, minimum size of val neg sample: {val_min_len}"
     )
 
-    
+
 # paraphrasing된 질문을 넣은 데이터셋을 저장
 def paraphrased():
     # paraphrased 데이터셋을 반환
@@ -492,5 +491,108 @@ def paraphrased():
     final_dataset.save_to_disk(f"{parent_directory}/data/paraphrased")
 
 
+# train의 context, question, answer의 길이 분포에 맞게 data를 생성해주는 함수
+def filtered_outliers(target_name: str):
+    """
+    파라미터로 이상치를 제거하고 싶은 파일의 폴더 이름을 입력하세요.
+    """
+    parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # Load the reference dataset (e.g., 'default' dataset)
+    reference_data_path = f"{parent_directory}/data/default"
+    reference_dataset = load_from_disk(reference_data_path)
+    reference_df = reference_dataset["train"].to_pandas()
+
+    # Compute lengths in the reference dataset
+    reference_lengths = {
+        "context": reference_df["context"].str.len(),
+        "question": reference_df["question"].str.len(),
+        "answers_text": reference_df["answers"].apply(
+            lambda x: (
+                len(x["text"][0])
+                if isinstance(x["text"], list) and len(x["text"]) > 0
+                else 0
+            )
+        ),
+    }
+
+    # Compute IQR bounds
+    def get_iqr_bounds(series):
+        q1 = series.quantile(0.25)
+        q3 = series.quantile(0.75)
+        iqr = q3 - q1
+        lower_bound = max(q1 - 1.5 * iqr, series.min())  # Ensure not less than min
+        upper_bound = min(q3 + 1.5 * iqr, series.max())  # Ensure not more than max
+        return lower_bound, upper_bound
+
+    context_bounds = get_iqr_bounds(reference_lengths["context"])
+    question_bounds = get_iqr_bounds(reference_lengths["question"])
+    answers_text_bounds = get_iqr_bounds(reference_lengths["answers_text"])
+
+    # Function to check if a value is within bounds
+    def is_within_bounds(length, bounds):
+        return bounds[0] <= length <= bounds[1]
+
+    # Function to filter outliers from a dataset
+    def filter_outliers(dataset, context_bounds, question_bounds, answers_text_bounds):
+        df = dataset.to_pandas()
+
+        # Calculate lengths
+        df["context_len"] = df["context"].str.len()
+        df["question_len"] = df["question"].str.len()
+        df["answers_text_len"] = df["answers"].apply(
+            lambda x: (
+                len(x["text"][0])
+                if isinstance(x["text"], list) and len(x["text"]) > 0
+                else 0
+            )
+        )
+
+        # Determine non-outliers
+        mask = (
+            df["context_len"].apply(lambda x: is_within_bounds(x, context_bounds))
+            & df["question_len"].apply(lambda x: is_within_bounds(x, question_bounds))
+            & df["answers_text_len"].apply(
+                lambda x: is_within_bounds(x, answers_text_bounds)
+            )
+        )
+
+        # Create filtered dataset
+        filtered_df = df[mask].drop(
+            columns=["context_len", "question_len", "answers_text_len"]
+        )
+        return Dataset.from_pandas(filtered_df, preserve_index=False)
+
+    # Load the datasets you want to filter (e.g., 'paraphrased' dataset)
+    dataset_to_filter_path = f"{parent_directory}/data/{target_name}"
+    if not os.path.exists(dataset_to_filter_path):
+        print(
+            f"Dataset not found at {dataset_to_filter_path}. Please generate it first."
+        )
+        return
+
+    dataset_to_filter = load_from_disk(dataset_to_filter_path)
+    train_dataset = dataset_to_filter["train"]
+    validation_dataset = dataset_to_filter["validation"]
+
+    # Filter datasets
+    filtered_train_dataset = filter_outliers(
+        train_dataset, context_bounds, question_bounds, answers_text_bounds
+    )
+    filtered_validation_dataset = filter_outliers(
+        validation_dataset, context_bounds, question_bounds, answers_text_bounds
+    )
+
+    # Save the filtered datasets
+    final_dataset = DatasetDict(
+        {"train": filtered_train_dataset, "validation": filtered_validation_dataset}
+    )
+    output_dataset_path = f"{parent_directory}/data/{target_name}_filtered"
+    os.makedirs(output_dataset_path, exist_ok=True)
+    final_dataset.save_to_disk(output_dataset_path)
+
+    print(f"Filtered dataset saved to {output_dataset_path}")
+
+
 if __name__ == "__main__":
-    default()
+    # default()
+    filtered_outliers("aug_prev")

@@ -1,8 +1,8 @@
 prediction:  # prediction은 nbest파일 경로를 넣어 주세요!
   validation: /outputs/sep-inf50_rerank_original_default_bz=16_lr=1.7110631470130408e-05_eval_nbest_predictions.json
-  test: /outputs/sep-inf50_rerank_original_default_bz=16_lr=1.7110631470130408e-05_test_nbest_predictions.json
+  test: /outputs/sep-inf50_rerank_original_default_bz=16_lr=1.7110631470130408e-05_test_nbest_predictions(1).json
 
 retrieval:
   dense: /data/retrieval_compare/BiEncoderDenseRetrieval-BiEncoderDenseRetrieval-compare-result.json
-  sparse: /data/retrieval_compare/SubwordBm25Retrieval-TfIdfRetrieval-compare-result.json
+  sparse: /data/SubwordBm25Retrieval-TfIdfRetrieval-compare-result.json
   mode: sparse

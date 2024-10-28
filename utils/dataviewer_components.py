@@ -126,7 +126,6 @@ def view_documents(documents):
 
 def view_tokenized_example(data_module, example, key):
     tokenize_button = st.button("Tokenize🤖", key=key)
-
     if tokenize_button:
         examples = Dataset.from_list([example])
         data = data_module.get_dataset(
@@ -156,7 +155,6 @@ def view_tokenized_example(data_module, example, key):
                     colored_tokens.append(
                         f"<div style='display:inline-block; font-size:14px; border:1px solid #ddd; border-radius:5px; padding:1px 5px; margin:2px;'>{token}</div>"
                     )
-
             st.markdown(
                 f"""
                         <div style='background-color: #f7f7ff; border-radius: 10px; padding: 20px; margin-bottom: 20px;'>
