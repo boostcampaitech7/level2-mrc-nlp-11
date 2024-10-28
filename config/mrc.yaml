@@ -1,0 +1,34 @@
+data:
+  data_module: MrcDataModule
+  dataset_name: [default] # default, klue_mrc, squad_kor_v1, aug_new, paraphrased_filtered_32, squad_kor_v1_filtered_32, aug_new_filtered_32
+  preprocessing_num_workers: 1
+  max_seq_length: 384
+  max_answer_length: 30
+  doc_stride: 128
+  batch_size: 16
+  n_best_size: 5
+  preproc_list: [original] # title_context_merge_token
+  add_special_token: [] # <TITLE>, <TITLE_END>
+  remove_columns: [token_type_ids] #token_type_ids
+model:
+  plm_name: uomnf97/klue-roberta-finetuned-korquad-v2
+
+metric: [squad, bleu] #squad, bleu
+
+optimizer:
+  name: AdamW
+  lr: 1.1665979886943748e-05
+
+train:
+  output_dir: "outputs"
+  num_train_epochs: 7
+
+wandb:
+  enable: true
+  project: ${oc.env:PROJECT_NAME}
+
+device: cuda
+
+checkpoint_path: /data/ephemeral/home/sangyeop/level2-mrc-nlp-11/checkpoints/lora_True_dainty-pond-131_title_context_merge_token_default__bz=16_lr=1.1665979886943748e-05_fine_tuned_epoch=06_exact_match=70.42.ckpt
+
+use_lora: False
