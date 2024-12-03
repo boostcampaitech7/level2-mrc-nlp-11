@@ -1,0 +1,20 @@
+program: train_dense_retrieval.py
+method: grid
+metric:
+  name: accuracy
+  goal: maximize
+parameters:
+  bi.model.plm_name:
+    values: [snunlp/KR-ELECTRA-discriminator, klue/roberta-base]
+  bi.data.use_overflow_token:
+    values: [true, false]
+  bi.data.num_neg:
+    values: [3, 10]
+  bi.data.batch_size:
+    values: [4, 12]
+
+command:
+- ${env}
+- ${interpreter}
+- ${program}
+- ${args_no_hyphens}
