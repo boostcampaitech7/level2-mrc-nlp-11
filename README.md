@@ -167,4 +167,4 @@ template
 
 ## 6 Wrap-up Report
 
-자세한 내용은 <a href="https://github.com/boostcampaitech7/level2-mrc-nlp-11/blob/docs-55/upload_readme_report/ODQA%EB%8C%80%ED%9A%8C_NLP_%ED%8C%80%20%EB%A6%AC%ED%8F%AC%ED%8A%B8(11%EC%A1%B0).pdf">**Wrap-up Report**</a>를 참고해 주세요 !
+자세한 내용은 <a href="https://github.com/boostcampaitech7/level2-mrc-nlp-11/blob/main/ODQA%EB%8C%80%ED%9A%8C_NLP_%ED%8C%80%20%EB%A6%AC%ED%8F%AC%ED%8A%B8(11%EC%A1%B0).pdf">**Wrap-up Report**</a>를 참고해 주세요 !
